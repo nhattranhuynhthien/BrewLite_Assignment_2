@@ -49,3 +49,6 @@ Thumbs.db
 *.tsbuildinfo
 .vercel
 .turbo
+
+# Personal / Local docs (Không track lên git)
+mydocs/
