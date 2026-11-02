@@ -24,7 +24,7 @@ Bảng đặc tả Use Case
 
 **Luồng thay thế :**
 
-* **A1:** Khách áp mã khuyến mãi trước bước 4 → hệ thống tính lại tổng tiền.
+* **A1:** Khách áp mã khuyến mãi và điểm tích lũy trước bước 4 → hệ thống tính lại tổng tiền.
 * **A2:** Khách đổi phương thức thanh toán trước khi xác nhận.
 
 **Luồng ngoại lệ :**
