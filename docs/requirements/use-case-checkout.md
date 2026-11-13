@@ -1,4 +1,4 @@
-![Sơ đồ Use Case](./images/use-case-diagram.png)
+Sơ đồ tổng quát: [use-case-overview.svg](../diagrams/use-case-overview.svg) (nguồn: [use-case-overview.puml](../diagrams/use-case-overview.puml)).
 Bảng đặc tả Use Case
 
 | Mục | Nội dung |
@@ -9,14 +9,14 @@ Bảng đặc tả Use Case
 | **Tiền điều kiện** | Đã đăng nhập; giỏ hàng có ít nhất 1 món |
 | **Hậu điều kiện (thành công)** | Đơn được tạo, tồn kho đã trừ, thanh toán thành công, đơn ở trạng thái “Đã thanh toán”, khách thấy xác nhận |
 | **Hậu điều kiện (thất bại)** | Không trừ tiền; tồn kho không bị trừ sai; khách được thông báo lỗi |
-| **Liên kết yêu cầu** | FR-03, FR-04, FR-05, FR-06, NFR-02, NFR-03
+| **Liên kết yêu cầu** | FR-06, FR-07, FR-30–FR-38; NFR-01–NFR-07 (theo phạm vi áp dụng trong [SRS tổng quát](./srs.md)) |
 
 
 1. Khách mở giỏ hàng và bấm “Đặt hàng”.
 2. Hệ thống kiểm tra JWT hợp lệ.
 3. Hệ thống validate giỏ hàng (giá, số lượng, tồn kho).
-4. Khách chọn phương thức thanh toán (Ví/Thẻ).
-5. Hệ thống tạo đơn và trừ tồn kho trong một transaction.
+4. Hệ thống tạo đơn và trừ tồn kho trong một transaction.
+5. Khách chọn phương thức thanh toán (Ví/Thẻ).
 6. Hệ thống gọi Payment Service kèm idempotency key.
 7. Payment Service trả thành công.
 8. Hệ thống cập nhật trạng thái đơn và thanh toán.
