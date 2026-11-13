@@ -66,9 +66,9 @@ BrewLite là ứng dụng đặt đồ uống theo mô hình mobile-first/PWA s�
 
 **Luồng sự kiện chính:**
 1. Khách hàng lựa chọn Size (bắt buộc), danh sách Topping (tùy chọn), nhập ghi chú và số lượng muốn mua.
-2. Giao diện tự động tính toán đơn giá dòng và hiển thị thành tiền tức thời dựa trên quy tắc `BR-01`.
+2. Giao diện tự động tính toán đơn giá dòng và hiển thị thành tiền tức thời dựa trên quy tắc.
 3. Khách hàng bấm "Thêm vào giỏ hàng".
-4. Hệ thống kiểm tra hợp lệ: đã chọn size, số lượng $\ge 1$, tổng số topping không vượt quá 5, số lượng ly không vượt quá mức tối đa cho phép theo tồn kho nguyên liệu (`BR-02`).
+4. Hệ thống kiểm tra hợp lệ: đã chọn size, số lượng $\ge 1$, tổng số topping không vượt quá 5, số lượng ly không vượt quá mức tối đa cho phép theo tồn kho nguyên liệu .
 5. Hệ thống tìm kiếm các dòng hiện có trong giỏ xem có trùng khớp hoàn toàn cấu hình (`productId`, `sizeId`, danh sách `toppingIds`, `note`) hay không.
 6. Nếu trùng, hệ thống cộng dồn số lượng; nếu không trùng, tạo mới một `CartItem`.
 7. Lưu trạng thái giỏ vào `localStorage`, hiển thị thông báo ngắn (Toast) xác nhận thành công.
@@ -83,8 +83,8 @@ BrewLite là ứng dụng đặt đồ uống theo mô hình mobile-first/PWA s�
 | **FR-CART-02** | Ràng buộc dữ liệu đầu vào khi thêm | **Must** | Chưa chọn size mà bấm thêm → Chặn thao tác và hiển thị lỗi cảnh báo cạnh nhóm chọn size. |
 | **FR-CART-03** | Gộp dòng sản phẩm trùng cấu hình | **Must** | Thêm 2 lần cùng một món y hệt nhau → Tự động gộp thành 1 dòng với số lượng cộng dồn; nếu khác ghi chú → Tách thành 2 dòng riêng. |
 | **FR-CART-04** | Hiển thị chi tiết danh sách giỏ hàng | **Must** | Màn hình giỏ hàng hiển thị đầy đủ: ảnh thu nhỏ, tên món, biến thể size, danh sách topping, ghi chú, đơn giá và thành tiền từng dòng. |
-| **FR-CART-05** | Tăng/giảm số lượng từng dòng | **Must** | Bấm nút `+`/`-` làm thay đổi số lượng lập tức và cập nhật tổng tiền; nút `+` bị vô hiệu hóa khi chạm giới hạn `MaxCups` (`BR-02`). |
-| **FR-CART-06** | Tính toán tổng tạm tính tự động | **Must** | Mọi thay đổi về số lượng hoặc dòng sản phẩm đều làm cập nhật chính xác tổng tạm tính theo công thức `BR-01`. |
+| **FR-CART-05** | Tăng/giảm số lượng từng dòng | **Must** | Bấm nút `+`/`-` làm thay đổi số lượng lập tức và cập nhật tổng tiền; nút `+` bị vô hiệu hóa khi chạm giới hạn `MaxCups` . |
+| **FR-CART-06** | Tính toán tổng tạm tính tự động | **Must** | Mọi thay đổi về số lượng hoặc dòng sản phẩm đều làm cập nhật chính xác tổng tạm tính theo công thức. |
 | **FR-CART-07** | Lưu trữ bền vững phía Client | **Must** | Thêm sản phẩm vào giỏ → Tải lại trang (F5) hoặc đóng mở lại trình duyệt → Giỏ hàng vẫn được khôi phục nguyên vẹn. |
 | **FR-CART-08** | Chỉnh sửa cấu hình món trong giỏ | **Must** | Cho phép mở lại bảng tùy chỉnh để đổi Size hoặc Topping của món đang nằm trong giỏ và tự động tính lại đơn giá. |
 | **FR-CART-09** | Đồng bộ và xác thực giỏ hàng qua API | **Must** | Gọi `POST /cart/validate` khi mở giỏ hàng để đối chiếu giá mới nhất và kiểm tra tình trạng nguyên liệu từ backend. |
@@ -137,15 +137,6 @@ Phạm vi giao diện bao gồm 5 màn hình chính: `SCR-01` (Menu), `SCR-02` (
 
 ---
 
-## 7. Giao diện lập trình ứng dụng (API Contracts)
-
-Các endpoint tích hợp chính cho phân hệ Giỏ hàng và Giao diện:
-1. **`GET /products` & `GET /products/:id`**: Trả về danh sách/chi tiết sản phẩm, size, topping, công thức định lượng (`Recipe`) và tồn kho nguyên liệu (`stockQty`) để tính `MaxCups` (`BR-02`).
-2. **`POST /cart/validate`**: Nhận danh sách các dòng giỏ hàng từ client, thực hiện đối chiếu giá hiện tại, kiểm tra tồn kho và trả về kết quả validate chi tiết cho từng dòng.
-3. **`POST /orders`**: Nhận payload đặt đơn kèm JWT Token từ client, thực hiện khóa giao dịch, tính toán lại giá chính xác ở server và trừ kho nguyên liệu.
-
----
-
 ## 8. Mô hình dữ liệu Giỏ hàng
 
 * **`CartItem`**: `id` (UUID), `productId`, `sizeId`, `toppingIds[]` (đã sắp xếp), `quantity`, `note`, `unitPriceSnapshot`, `addedAt`.
@@ -159,7 +150,7 @@ Các endpoint tích hợp chính cho phân hệ Giỏ hàng và Giao diện:
 | Mã yêu cầu | Use-case tương ứng | Sơ đồ thiết kế liên quan | API / Thành phần mã nguồn | Test Case kiểm thử |
 | :--- | :--- | :--- | :--- | :--- |
 | **FR-CART-01** | UC-C1 (Thêm món) | Activity-01, Class-01 | `useCartStore.addItem()` (Next.js) | `UNIT-CART-01` (Gộp dòng trùng) |
-| **FR-CART-02** | UC-C1 (Kiểm tra dữ liệu) | BR-02 (`MaxCups`) | `calculateMaxCups()` (Shared) | `UNIT-CART-02` (Chặn quá tồn kho) |
+| **FR-CART-02** | UC-C1 (Kiểm tra dữ liệu) | (`MaxCups()`) | `calculateMaxCups()` (Shared) | `UNIT-CART-02` (Chặn quá tồn kho) |
 | **FR-CART-09** | UC-C5 (Đồng bộ giỏ) | Sequence-Checkout | `POST /cart/validate` (NestJS) | `INT-CART-01` (Kiểm tra validate giá/kho) |
 | **FR-UI-01** | SCR-01 (Menu Responsive) | Deployment-01 | `MenuPage` (Next.js PWA) | `UI-RESP-01` (Kiểm tra đa màn hình) |
 | **FR-UI-07** | SCR-01, SCR-03 (Loading) | Activity-01 | `CartSkeleton` component | `UI-STATE-01` (Kiểm tra Skeleton) |
