@@ -6,10 +6,10 @@
 | Phiên bản | 0.1 (bản nháp) |
 | Tác giả | TV4 |
 | Phạm vi | Tạo đơn, tính tổng tiền, trừ tồn kho trong transaction, thanh toán Ví/Thẻ mô phỏng, idempotency, xử lý thành công/thất bại/timeout, hủy đơn quá hạn, màn hình xác nhận đơn, khuyến mãi/tích điểm (Could) |
-| Hợp nhất | TV2 hợp nhất vào SRS chung ở D-08 và chốt mã chính thức |
+| Hợp nhất | Chi tiết yêu cầu thành phần; mã chính thức theo [SRS tổng quát](./srs.md) |
 | Tài liệu liên quan | `context-and-scope.md`, `srs-menu-product.md`, đặc tả UC-01, `docs/diagrams/sequence-checkout.puml`, ADR-004, ADR-005, ADR-006, ADR-007 |
 
-> **Về mã yêu cầu:** các mã dưới đây là **tạm thời**, theo dải đã thống nhất: FR-30–FR-39 đặt đơn/thanh toán (TV4). NFR của nhóm này đánh `NFR-ORD-01…`; TV2 ánh xạ sang `NFR-xx` khi hợp nhất và giữ bảng ánh xạ cũ → mới để không vỡ truy vết.
+> Các mã FR/NFR trong tài liệu này dùng theo bộ mã chuẩn tại [SRS tổng quát](./srs.md). Đây là phần tiêu chí chi tiết cho đặt đơn/thanh toán; SRS tổng quát là nguồn chuẩn khi tra mã và phạm vi.
 
 ## 0. Phụ thuộc vào các nhóm yêu cầu khác
 
@@ -44,13 +44,13 @@ Trạng thái thanh toán (`Payment`): `PENDING`, `SUCCESS`, `FAILED`.
 
 | Mã | Nhóm | Yêu cầu | MoSCoW |
 |---|---|---|---|
-| NFR-ORD-01 | Toàn vẹn dữ liệu và đồng thời | Tồn kho không bao giờ âm; mỗi đơn có tối đa một thanh toán `SUCCESS`; hai yêu cầu đồng thời không làm sai tồn kho hoặc tính tiền hai lần; tạo đơn và trừ kho là all-or-nothing. | Must |
-| NFR-ORD-02 | Bảo mật | `POST /orders` và `POST /payments` yêu cầu JWT hợp lệ; chỉ chủ đơn được thanh toán đơn của mình; không lưu hoặc ghi log số thẻ, mật khẩu, JWT; hệ thống chỉ tin giá và số tiền do server tính. | Must |
-| NFR-ORD-03 | Khả năng phục hồi | Lỗi giữa chừng hoặc timeout của Payment Service không làm mất, trùng hoặc lệch tiền, tồn kho; trạng thái cuối của đơn xác định được bằng đối soát. | Must |
-| NFR-ORD-04 | Hiệu năng | `POST /orders` có p95 ≤ 500 ms với bộ dữ liệu seed, đo ở local bằng công cụ tải (không tính độ trễ giả lập của gateway). Ngưỡng đề xuất, nhóm xác nhận. | Should |
-| NFR-ORD-05 | Khả dụng (UI) | Màn hình giỏ hàng, thanh toán, xác nhận có trạng thái loading/error; nút gửi bị vô hiệu hóa khi đang xử lý; thông báo lỗi nêu được nguyên nhân (hết hàng, thanh toán thất bại, hết phiên). | Should |
-| NFR-ORD-06 | Khả năng tích hợp | Hợp đồng `POST /orders`, `POST /payments` (request, response, mã lỗi 400/401/402/403/409/422/202) được công bố trong Swagger/OpenAPI và khớp với code. | Must |
-| NFR-ORD-07 | Khả năng kiểm thử | Có unit test cho tính tổng, chuyển trạng thái, idempotency; integration test cho tạo đơn và thanh toán trên PostgreSQL thật, gồm các kịch bản: thành công, hết hàng, thanh toán thất bại, gửi lại cùng key, đồng thời, timeout. | Must |
+| NFR-02 | Toàn vẹn dữ liệu và đồng thời | Tồn kho không bao giờ âm; mỗi đơn có tối đa một thanh toán `SUCCESS`; hai yêu cầu đồng thời không làm sai tồn kho hoặc tính tiền hai lần; tạo đơn và trừ kho là all-or-nothing. | Must |
+| NFR-03 | Bảo mật | `POST /orders` và `POST /payments` yêu cầu JWT hợp lệ; chỉ chủ đơn được thanh toán đơn của mình; không lưu hoặc ghi log số thẻ, mật khẩu, JWT; hệ thống chỉ tin giá và số tiền do server tính. | Must |
+| NFR-04 | Khả năng phục hồi | Lỗi giữa chừng hoặc timeout của Payment Service không làm mất, trùng hoặc lệch tiền, tồn kho; trạng thái cuối của đơn xác định được bằng đối soát. | Must |
+| NFR-01 | Hiệu năng | `POST /orders` có p95 ≤ 500 ms với bộ dữ liệu seed, đo ở local bằng công cụ tải (không tính độ trễ giả lập của gateway). Ngưỡng đề xuất, nhóm xác nhận. | Should |
+| NFR-05 | Khả dụng (UI) | Màn hình giỏ hàng, thanh toán, xác nhận có trạng thái loading/error; nút gửi bị vô hiệu hóa khi đang xử lý; thông báo lỗi nêu được nguyên nhân (hết hàng, thanh toán thất bại, hết phiên). | Should |
+| NFR-06 | Khả năng tích hợp | Hợp đồng `POST /orders`, `POST /payments` (request, response, mã lỗi 400/401/402/403/409/422/202) được công bố trong Swagger/OpenAPI và khớp với code. | Must |
+| NFR-07 | Khả năng kiểm thử | Có unit test cho tính tổng, chuyển trạng thái, idempotency; integration test cho tạo đơn và thanh toán trên PostgreSQL thật, gồm các kịch bản: thành công, hết hàng, thanh toán thất bại, gửi lại cùng key, đồng thời, timeout. | Must |
 
 ## 3. Tiêu chí chấp nhận
 
@@ -120,13 +120,13 @@ Trạng thái thanh toán (`Payment`): `PENDING`, `SUCCESS`, `FAILED`.
 - **AC-39.3** Given khách dùng điểm không vượt số dư, When tạo đơn, Then điểm bị trừ trong cùng transaction; thanh toán thất bại thì điểm được hoàn.
 
 ### NFR
-- **AC-ORD-01** (NFR-ORD-01) Ghi `stock_quantity = -1` trực tiếp vào database bị từ chối; chèn payment `SUCCESS` thứ hai cho cùng đơn bị từ chối bởi partial unique index; kết hợp AC-32.4 và AC-34.2.
-- **AC-ORD-02** (NFR-ORD-02) Gọi `POST /orders` và `POST /payments` không có JWT trả 401; log của luồng thành công và lỗi không chứa mật khẩu, JWT, số thẻ.
-- **AC-ORD-03** (NFR-ORD-03) Chạy đủ bốn kịch bản của gateway (thành công, từ chối, `TIMEOUT_CHARGED`, `TIMEOUT_NOT_CHARGED`) thì mọi đơn kết thúc ở trạng thái cuối đúng và tồn kho khớp với số đơn `PAID`.
-- **AC-ORD-04** (NFR-ORD-04) Với seed chuẩn, 50 kết nối đồng thời trong 30 giây, p95 của `POST /orders` ≤ 500 ms.
-- **AC-ORD-05** (NFR-ORD-05) Kiểm tra giao diện: có loading, error và nút bị vô hiệu hóa khi đang gửi (đi kèm AC-38.5).
-- **AC-ORD-06** (NFR-ORD-06) Swagger mô tả `POST /orders` và `POST /payments` với schema request/response, header `Idempotency-Key`, các mã lỗi, và khớp với phản hồi thực tế.
-- **AC-ORD-07** (NFR-ORD-07) Lệnh test của `apps/api` chạy được các unit test và integration test nêu trên trong CI; mỗi AC-32.x, AC-34.x, AC-35.x, AC-36.x có ít nhất một test.
+- **AC-ORD-01** (NFR-02) Ghi `stock_quantity = -1` trực tiếp vào database bị từ chối; chèn payment `SUCCESS` thứ hai cho cùng đơn bị từ chối bởi partial unique index; kết hợp AC-32.4 và AC-34.2.
+- **AC-ORD-02** (NFR-03) Gọi `POST /orders` và `POST /payments` không có JWT trả 401; log của luồng thành công và lỗi không chứa mật khẩu, JWT, số thẻ.
+- **AC-ORD-03** (NFR-04) Chạy đủ bốn kịch bản của gateway (thành công, từ chối, `TIMEOUT_CHARGED`, `TIMEOUT_NOT_CHARGED`) thì mọi đơn kết thúc ở trạng thái cuối đúng và tồn kho khớp với số đơn `PAID`.
+- **AC-ORD-04** (NFR-01) Với seed chuẩn, 50 kết nối đồng thời trong 30 giây, p95 của `POST /orders` ≤ 500 ms.
+- **AC-ORD-05** (NFR-05) Kiểm tra giao diện: có loading, error và nút bị vô hiệu hóa khi đang gửi (đi kèm AC-38.5).
+- **AC-ORD-06** (NFR-06) Swagger mô tả `POST /orders` và `POST /payments` với schema request/response, header `Idempotency-Key`, các mã lỗi, và khớp với phản hồi thực tế.
+- **AC-ORD-07** (NFR-07) Lệnh test của `apps/api` chạy được các unit test và integration test nêu trên trong CI; mỗi AC-32.x, AC-34.x, AC-35.x, AC-36.x có ít nhất một test.
 
 ## 4. Liên kết với use-case, sơ đồ và code (đầu vào cho ma trận truy vết)
 
@@ -142,16 +142,12 @@ Trạng thái thanh toán (`Payment`): `PENDING`, `SUCCESS`, `FAILED`.
 | FR-37 | UC-01 (ghi chú job nền) | Sequence-01 (ghi chú) | Job nền `payments` | INT-T18 |
 | FR-38 | UC-01 | Activity-01, Sequence-01 | Màn hình xác nhận (`apps/web`) | E2E-T01 |
 | FR-39 | UC-01 (luồng A1, mở rộng) | Use-case diagram (extend), Class-01 (Promotion, LoyaltyTransaction) | `PromotionsService`, `LoyaltyService` | INT-T19 |
-| NFR-ORD-01 | UC-01 | Class-01 | Migration (CHECK, partial unique index) | MIG-T10, INT-T13 |
-| NFR-ORD-06 | – | – | Swagger/OpenAPI | API-T10 |
+| NFR-02 | UC-01 | Class-01 | Migration (CHECK, partial unique index) | MIG-T10, INT-T13 |
+| NFR-06 | – | – | Swagger/OpenAPI | API-T10 |
 
-Mã use-case, sơ đồ và mã test là **đề xuất**; TV2, TV6 xác nhận khi hợp nhất SRS và điền `docs/traceability-matrix.md`. Mã test dùng dải mới (`INT-T10…`) để không trùng với nhóm menu (`INT-T01`).
+Mã test trong bảng là mã đề xuất để lập ma trận truy vết; chúng không phải mã FR/NFR. Mã UC-01 và các mã FR/NFR tuân theo [SRS tổng quát](./srs.md).
 
-## 5. Việc cần thống nhất khi hợp nhất
+## 5. Quy ước hợp nhất
 
-1. **Đặc tả UC-01:** đổi cột "Liên kết yêu cầu" thành FR-06, FR-07, FR-30 đến FR-38 (cộng FR-39 cho luồng mở rộng), FR xác thực của TV2, và các NFR-ORD tương ứng. Các mã FR-03, FR-04, FR-05 đang ghi trong spec hiện là mã của nhóm menu và không liên quan đặt đơn.
-2. **Thứ tự bước trong UC-01:** chọn phương thức thanh toán diễn ra sau khi tạo đơn (khớp sequence 2.2).
-3. **Trạng thái đơn:** thống nhất với TV6 danh sách `OrderStatus` đầy đủ (gồm các trạng thái sau thanh toán) và với class diagram.
-4. **Mã lỗi và định dạng lỗi:** thống nhất với TV2 và TV3 (`401`, `403`, `409 OUT_OF_STOCK`, `422`, `402`) để Swagger nhất quán.
-5. **NFR bảo mật chung** (băm mật khẩu, JWT hết hạn, rate limit) thuộc nhóm xác thực của TV2; NFR-ORD-02 chỉ nêu phần riêng của đặt đơn và thanh toán, tránh trùng lặp khi hợp nhất.
+SRS tổng quát chốt mã dùng chung và kết hợp yêu cầu bảo mật, hiệu năng, API, kiểm thử và vận hành. Bảng này giữ tiêu chí chấp nhận chi tiết của nhóm đặt đơn/thanh toán; mọi thay đổi mã hoặc phạm vi sau này cần cập nhật SRS tổng quát và bảng ánh xạ NFR tại đó.
 

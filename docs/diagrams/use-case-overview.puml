@@ -1,0 +1,47 @@
+@startuml use-case-overview
+title Use-case tổng quát – BrewLite
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Khách hàng" as Customer
+actor "Nhân viên quầy\n(STAFF)" as Staff
+actor "Payment Service\n(mô phỏng)" as Payment
+
+rectangle "BrewLite" {
+  usecase "UC-02\nXem menu,\nchi tiết sản phẩm\n[FR-01..05]" as UC1
+  usecase "Lọc / tìm\nsản phẩm\n[FR-02..03]" as UC1a
+  usecase "UC-03\nQuản lý giỏ hàng\n[FR-10..15]" as UC2
+  usecase "UC-04\nĐăng ký / đăng nhập\n[FR-20..24]" as UC3
+  usecase "UC-01\nĐặt và thanh toán đơn\n[FR-06..07, 30..38]" as UC4
+  usecase "Tạo đơn hàng\n[FR-30..32]" as UC4c
+  usecase "Thanh toán đơn\n[FR-33..38]" as UC4a
+  usecase "Áp dụng khuyến mãi /\nđiểm tích lũy\n[FR-39, Could]" as UC4b
+  usecase "UC-05\nXem lịch sử và\ntrạng thái đơn\n[FR-40..41]" as UC5
+  usecase "UC-06\nXem đơn cần xử lý /\ncập nhật trạng thái\n[FR-42..44]" as UC6
+}
+
+Customer -- UC1
+Customer -- UC2
+Customer -- UC3
+Customer -- UC4
+Customer -- UC4a
+Customer -- UC5
+Staff -- UC3
+Staff -- UC6
+Payment -- UC4a
+
+UC1a ..> UC1 : <<extend>>
+UC4c ..> UC4 : <<include>>
+UC4a ..> UC4 : <<include>>
+UC4b ..> UC4 : <<extend>>
+UC4 ..> UC2 : <<include>>
+note bottom of UC4a
+  Thanh toán Ví/Thẻ mô phỏng;
+  timeout được đối soát.
+end note
+note bottom of UC6
+  Chỉ STAFF được cập nhật;
+  luồng trạng thái được kiểm tra.
+end note
+@enduml

@@ -6,11 +6,9 @@
 | Phiên bản | 0.1 (bản nháp) |
 | Tác giả | Đỗ Hoàng Vinh (TV3) |
 | Phạm vi | Menu, chi tiết sản phẩm, size/topping, tính giá, tồn kho, dữ liệu mẫu |
-| Hợp nhất | TV2 hợp nhất vào SRS chung ở D-08 và chốt mã chính thức |
+| Hợp nhất | Chi tiết yêu cầu thành phần; mã chính thức theo [SRS tổng quát](./srs.md) |
 
-> **Về mã yêu cầu:** các mã dưới đây là **tạm thời**. Đề xuất chia dải mã để các thành viên không trùng nhau khi hợp nhất:
-> FR-01–FR-09 menu/sản phẩm (TV3), FR-10–FR-19 giỏ hàng/UI (TV5), FR-20–FR-29 xác thực (TV2), FR-30–FR-39 đặt đơn/thanh toán (TV4), FR-40–FR-49 lịch sử/trạng thái đơn (TV6).
-> NFR của nhóm này đánh NFR-01–NFR-04; TV2 đánh lại khi hợp nhất.
+> Các mã FR/NFR trong tài liệu này dùng theo bộ mã chuẩn tại [SRS tổng quát](./srs.md). Đây là phần tiêu chí chi tiết cho menu/sản phẩm; SRS tổng quát là nguồn chuẩn khi tra mã và phạm vi.
 
 ## 1. Yêu cầu chức năng
 
@@ -32,8 +30,8 @@
 |---|---|---|---|
 | NFR-01 | Hiệu năng | `GET /products` có p95 ≤ 300 ms với bộ dữ liệu seed không quá 200 sản phẩm, đo trên môi trường local bằng công cụ tải (ví dụ autocannon). | Should |
 | NFR-02 | Toàn vẹn dữ liệu | Giá lưu số nguyên VND; tồn kho không bao giờ âm (ràng buộc CHECK ở database); tên sản phẩm/topping không rỗng. | Must |
-| NFR-03 | Khả năng tích hợp | Hợp đồng request/response của `/products` được công bố bằng Swagger/OpenAPI và luôn khớp với code. | Must |
-| NFR-04 | Khả năng kiểm thử | `ProductsService` và `PricingService` có unit test chạy trong CI; các nhánh giá và tồn kho đều có test. | Must |
+| NFR-06 | Khả năng tích hợp | Hợp đồng request/response của `/products` được công bố bằng Swagger/OpenAPI và luôn khớp với code. | Must |
+| NFR-07 | Khả năng kiểm thử | `ProductsService` và `PricingService` có unit test chạy trong CI; các nhánh giá và tồn kho đều có test. | Must |
 
 ## 3. Tiêu chí chấp nhận
 
@@ -87,10 +85,10 @@ Dùng dạng Given/When/Then để có thể viết test trực tiếp.
 - **AC-N02.1** Ghi `stock_quantity = -1` trực tiếp vào database bị từ chối bởi ràng buộc CHECK.
 - **AC-N02.2** Cột giá có kiểu số nguyên; không có giá trị thập phân trong dữ liệu seed.
 
-### NFR-03 – Hợp đồng API
+### NFR-06 – Hợp đồng API
 - **AC-N03** Trang Swagger mô tả `GET /products` và `GET /products/:id` với schema request/response, mã lỗi 400/404, và khớp với phản hồi thực tế.
 
-### NFR-04 – Kiểm thử
+### NFR-07 – Kiểm thử
 - **AC-N04** Lệnh test của `apps/api` chạy `ProductsService` và `PricingService` thành công trong CI; mỗi ví dụ AC-06.x và AC-07.x có ít nhất một test tương ứng.
 
 ## 4. Liên kết với use-case, sơ đồ và code (đầu vào cho ma trận truy vết)
@@ -106,7 +104,7 @@ Dùng dạng Given/When/Then để có thể viết test trực tiếp.
 | FR-07 | UC-01 Đặt và thanh toán đơn hàng | Activity-01 (nhánh hết hàng), Sequence-01 | `ProductsService`, `POST /orders` | UT-T02, INT-T01 |
 | FR-08 | – (hỗ trợ MVP) | Class-01 | `db:seed`, migration | MIG-T01 |
 | NFR-02 | – | Class-01 | Migration (CHECK, kiểu số nguyên) | MIG-T02 |
-| NFR-03 | – | – | Swagger/OpenAPI | API-T06 |
+| NFR-06 | – | – | Swagger/OpenAPI | API-T06 |
 
 Mã user story (US-xx), use-case (UC-xx) và mã test là **đề xuất**; TV2, TV4 và TV6 xác nhận khi hợp nhất SRS và điền `docs/traceability-matrix.md`.
 
