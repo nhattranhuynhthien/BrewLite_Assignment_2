@@ -1,0 +1,50 @@
+@startuml sequence-checkout
+actor Customer
+participant "Next.js UI" as UI
+participant "NestJS API" as API
+database "Database" as DB
+participant "Payment Service" as PAY
+
+Customer -> UI: Bấm "Đặt hàng"
+UI -> API: POST /orders (Bearer JWT, items)
+API -> API: Verify JWT
+alt JWT không hợp lệ
+  API --> UI: 401 Unauthorized
+  UI --> Customer: Chuyển trang đăng nhập
+else JWT hợp lệ
+  API -> API: Validate DTO
+  group Transaction
+    API -> DB: BEGIN
+    API -> DB: Kiểm tra tồn kho
+    alt Hết hàng
+      API -> DB: ROLLBACK
+      API --> UI: 409 Out of stock
+      UI --> Customer: Báo món hết hàng
+    else Đủ hàng
+      API -> DB: INSERT order, order_items
+      API -> DB: UPDATE stock (trừ kho)
+      API -> DB: COMMIT
+    end
+  end
+  API --> UI: 201 {orderId, status: PENDING_PAYMENT}
+
+  UI -> API: POST /payments (orderId, method)\nIdempotency-Key: K
+  API -> DB: Tìm payment theo key K
+  alt Key đã tồn tại
+    API --> UI: Trả kết quả cũ
+  else Key mới
+    API -> PAY: charge(amount, key K)
+    alt Thành công
+      PAY --> API: SUCCESS
+      API -> DB: UPDATE order = PAID, insert payment
+      API --> UI: 200 PAID
+      UI --> Customer: Hiển thị xác nhận đơn
+    else Thất bại
+      PAY --> API: FAILED
+      API -> DB: UPDATE order = PAYMENT_FAILED, hoàn kho
+      API --> UI: 402 Payment failed
+      UI --> Customer: Báo lỗi, cho thử lại
+    end
+  end
+end
+@enduml
