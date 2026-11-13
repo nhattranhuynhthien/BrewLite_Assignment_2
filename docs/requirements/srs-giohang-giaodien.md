@@ -1,221 +1,176 @@
 # SRS BrewLite – Nhóm Giỏ hàng và Giao diện
 
-Bài tập lớn Công nghệ Phần mềm – Assignment 2, Task 1.2 · Phiên bản 1.0 · 13/11/2026 · Trường Đại học Sài Gòn, Khoa CNTT
+Bài tập lớn Công nghệ Phần mềm – Assignment 2, Task 1.2 · Phiên bản 1.1 · 14/11/2026 · Trường Đại học Sài Gòn, Khoa CNTT
 
 ## 1. Giới thiệu
 
 ### 1.1 Mục đích
-
-Tài liệu này đặc tả yêu cầu phần mềm cho hai nhóm chức năng của BrewLite: **Giỏ hàng** (mã CART) và **Giao diện người dùng** (mã UI). Tài liệu là một phần của SRS rút gọn theo Task 1.2, dùng làm căn cứ để thiết kế (Task 2–3), hiện thực (Task 4–5) và viết kiểm thử.
+Tài liệu này đặc tả yêu cầu phần mềm chi tiết cho hai nhóm chức năng cốt lõi của ứng dụng BrewLite: **Phân hệ Giỏ hàng (CART)** và **Phân hệ Giao diện người dùng (UI)**. Tài liệu phục vụ làm căn cứ kỹ thuật cho Task 1.2, định hướng thiết kế (Task 2–3), hiện thực mã nguồn (Task 4–5) và xây dựng bộ kiểm thử.
 
 ### 1.2 Phạm vi
+BrewLite là ứng dụng đặt đồ uống theo mô hình mobile-first/PWA sử dụng công nghệ Next.js, NestJS, PostgreSQL và Docker. Luồng nghiệp vụ tối thiểu đi qua hệ thống: `Xem menu → Chọn tùy chọn → Giỏ hàng → Đặt đơn → Thanh toán → Theo dõi đơn`.
 
-BrewLite là ứng dụng đặt đồ uống mobile-first/PWA (Next.js, NestJS, PostgreSQL). Luồng nghiệp vụ tối thiểu: Xem menu → Chọn tùy chọn → **Giỏ hàng** → Đặt đơn → Thanh toán → Theo dõi đơn.
+* **Trong phạm vi tài liệu này (In-scope):** Toàn bộ nghiệp vụ quản lý giỏ hàng (thêm, sửa, xóa, gộp dòng, tính tạm tính, đồng bộ giá, kiểm tra tồn nguyên liệu động theo công thức) và toàn bộ yêu cầu trải nghiệm giao diện người dùng (bố cục 5 màn hình chính, trạng thái tải/rỗng/lỗi, phản hồi tương tác, PWA).
+* **Ngoài phạm vi tài liệu này (Out-of-scope):** Quản lý tài khoản người dùng, xử lý cổng thanh toán trực tuyến, thực thi trừ kho trong cơ sở dữ liệu và quản lý trạng thái đơn hàng tại quầy (thuộc các nhóm chức năng khác).
 
-**Trong phạm vi tài liệu này:**
-
-* Thêm, sửa, xóa món; tính tổng tiền; kiểm tra tồn kho và giá của giỏ hàng; chuyển từ giỏ sang đặt đơn.
-* Yêu cầu chung về giao diện: bố cục, trạng thái màn hình, điều hướng, phản hồi người dùng, khả năng truy cập, hiệu năng phía giao diện.
-* Các màn hình liên quan trực tiếp đến giỏ hàng: Menu, Chi tiết sản phẩm, Giỏ hàng, Đăng nhập khi thanh toán.
-
-**Ngoài phạm vi (thuộc nhóm khác trong SRS):** logic đăng ký/đăng nhập, tạo đơn, thanh toán, quản lý trạng thái đơn, trang quản trị của nhân viên.
-
-### 1.3 Thuật ngữ
+### 1.3 Thuật ngữ và Ký hiệu
 
 | Thuật ngữ | Giải thích |
 | --- | --- |
-| Dòng giỏ hàng (CartItem) | Một mục trong giỏ, xác định bởi sản phẩm + size + tập topping + ghi chú |
-| Đơn giá dòng | Giá gốc + phụ thu size + tổng giá topping, cho một ly |
-| Tạm tính | Tổng (đơn giá dòng × số lượng) của mọi dòng |
-| MoSCoW | Must / Should / Could / Won’t |
-| FR / NFR | Yêu cầu chức năng / phi chức năng |
+| Dòng giỏ hàng (`CartItem`) | Một mục sản phẩm trong giỏ được xác định duy nhất bởi sự kết hợp của `productId`, `sizeId`, tập hợp `toppingIds` và `note`. |
+| Đơn giá dòng | Giá bán một ly = Giá gốc sản phẩm + Phụ thu Size + Tổng giá các Topping. |
+| Tạm tính (Subtotal) | Tổng thành tiền của tất cả các dòng sản phẩm có trong giỏ hàng. |
+| MoSCoW | Mức độ ưu tiên yêu cầu: **Must** (Bắt buộc MVP), **Should** (Nên có), **Could** (Mở rộng), **Won't** (Không làm). |
+| FR / NFR | Yêu cầu chức năng / Yêu cầu phi chức năng. |
 
 ### 1.4 Tài liệu tham chiếu
+* Đề bài Bài tập lớn Công nghệ Phần mềm – Assignment 2 (Ver 1.0).
+* `docs/requirements/context-and-scope.md` (Task 1.1).
+* `docs/traceability-matrix.md` (Task 8).
 
-* Đề bài BrewLite – Assignment 2, Ver 1.0.
-* docs/requirements/context-and-scope.md (Task 1.1).
-* docs/traceability-matrix.md.
+---
 
 ## 2. Mô tả tổng quan
 
 ### 2.1 Actor
 
-| Actor | Vai trò với giỏ hàng và giao diện |
+| Actor | Vai trò đối với phân hệ Giỏ hàng và Giao diện |
 | --- | --- |
-| Khách hàng (chưa đăng nhập) | Xem menu, thêm món vào giỏ, chỉnh giỏ; phải đăng nhập mới được đặt đơn |
-| Khách hàng (đã đăng nhập) | Như trên, và tiếp tục sang đặt đơn |
-| NestJS API | Cung cấp dữ liệu sản phẩm, kiểm tra giỏ, tính lại giá |
-| Nhân viên quầy, quản lý | Không thao tác giỏ hàng; chỉ nhận đơn sau khi khách đặt |
+| Khách hàng (Chưa đăng nhập) | Xem menu, tùy chọn sản phẩm, thêm/sửa/xóa và quản lý giỏ hàng trên trình duyệt; bắt buộc đăng nhập khi chuyển sang bước đặt đơn. |
+| Khách hàng (Đã đăng nhập) | Thực hiện đầy đủ các thao tác giỏ hàng và chuyển tiếp thành công sang màn hình xác nhận đặt đơn. |
+| NestJS Backend API | Cung cấp dữ liệu danh mục, công thức nguyên liệu, tồn kho thực tế, thực hiện validate giá và nguyên liệu qua API. |
 
-### 2.2 Giả định và ràng buộc
+### 2.2 Giả định và ràng buộc hệ thống
+* **GS-01:** Giỏ hàng tạm thời lưu trữ ở client (`state` kết hợp `localStorage`) để khách vãng lai dễ dàng thao tác mà chưa cần tạo tài khoản. Backend chịu trách nhiệm kiểm tra lại toàn bộ trước khi tạo đơn.
+* **GS-02:** Đơn vị tiền tệ chuẩn là Đồng Việt Nam (VND), sử dụng số nguyên, không dùng số thập phân.
+* **RB-01:** Bắt buộc tuân thủ bộ công nghệ cốt lõi: Next.js (Frontend), NestJS (Backend), PostgreSQL (Database) và Docker (Triển khai).
+* **RB-02:** Ngôn ngữ giao diện chuẩn của ứng dụng trong phạm vi MVP là tiếng Việt.
 
-* **GS-01:** Giỏ hàng được giữ ở phía client (state + localStorage) để khách chưa đăng nhập vẫn dùng được; server chỉ kiểm tra và tính lại khi cần. Đây là quyết định đề xuất, cần xác nhận khi viết ADR (Task 3.1).
-* **GS-02:** Mọi giá tiền dùng VND, số nguyên, không có phần thập phân.
-* **GS-03:** Menu, size, topping và tồn kho lấy từ API; giỏ chỉ lưu mã tham chiếu và ảnh chụp giá để hiển thị.
-* **RB-01:** Frontend bắt buộc dùng Next.js theo hướng mobile-first/PWA; backend NestJS; cơ sở dữ liệu PostgreSQL.
-* **RB-02:** Ngôn ngữ giao diện của MVP là tiếng Việt.
+---
 
 ## 3. Use-case nhóm Giỏ hàng
 
-| Mã | Use-case | Actor chính | FR liên quan |
-| --- | --- | --- | --- |
-| UC-C1 | Thêm món vào giỏ | Khách hàng | FR-CART-01, 02, 03 |
-| UC-C2 | Xem giỏ và tổng tiền | Khách hàng | FR-CART-04, 07 |
-| UC-C3 | Sửa số lượng món | Khách hàng | FR-CART-05, 07 |
-| UC-C4 | Xóa món / làm trống giỏ | Khách hàng | FR-CART-06, 12 |
-| UC-C5 | Chuyển sang đặt đơn | Khách hàng | FR-CART-09, 10, 11 |
+| Mã Use-case | Tên Use-case | Actor chính | Yêu cầu liên quan |
+| :--- | :--- | :--- | :--- |
+| **UC-C1** | Thêm món vào giỏ hàng | Khách hàng | FR-CART-01, 02, 03 |
+| **UC-C2** | Xem giỏ hàng và tính tạm tính | Khách hàng | FR-CART-04, 06, 07 |
+| **UC-C3** | Cập nhật số lượng / Tùy chọn món | Khách hàng | FR-CART-03, 05, 08 |
+| **UC-C4** | Xóa sản phẩm / Làm trống giỏ | Khách hàng | FR-CART-04, 11 |
+| **UC-C5** | Kiểm tra và chuyển tiếp đặt đơn | Khách hàng | FR-CART-09, 10, 13, 15 |
 
-### 3.1 Đặc tả UC-C1 – Thêm món vào giỏ
+### 3.1 Đặc tả chi tiết: UC-C1 – Thêm món vào giỏ hàng
+* **Actor:** Khách hàng, hệ thống phụ NestJS API.
+* **Trigger:** Khách hàng bấm nút "Thêm vào giỏ" tại màn hình chi tiết sản phẩm (`SCR-02`).
+* **Tiền điều kiện:** Sản phẩm đang mở bán, dữ liệu size và topping đã được tải về đầy đủ.
+* **Hậu điều kiện:** Sản phẩm được thêm vào giỏ hàng ở client, badge số lượng trên thanh điều hướng cập nhật tăng lên.
 
-| Mục | Nội dung |
-| --- | --- |
-| Actor | Khách hàng; hệ thống phụ: NestJS API |
-| Trigger | Khách bấm “Thêm vào giỏ” trên màn hình Chi tiết sản phẩm |
-| Tiền điều kiện | Sản phẩm đang bán và còn hàng; màn hình đã tải xong dữ liệu tùy chọn |
-| Hậu điều kiện | Giỏ có thêm dòng mới hoặc số lượng của dòng trùng được tăng; badge giỏ cập nhật |
+**Luồng sự kiện chính:**
+1. Khách hàng lựa chọn Size (bắt buộc), danh sách Topping (tùy chọn), nhập ghi chú và số lượng muốn mua.
+2. Giao diện tự động tính toán đơn giá dòng và hiển thị thành tiền tức thời dựa trên quy tắc `BR-01`.
+3. Khách hàng bấm "Thêm vào giỏ hàng".
+4. Hệ thống kiểm tra hợp lệ: đã chọn size, số lượng $\ge 1$, tổng số topping không vượt quá 5, số lượng ly không vượt quá mức tối đa cho phép theo tồn kho nguyên liệu (`BR-02`).
+5. Hệ thống tìm kiếm các dòng hiện có trong giỏ xem có trùng khớp hoàn toàn cấu hình (`productId`, `sizeId`, danh sách `toppingIds`, `note`) hay không.
+6. Nếu trùng, hệ thống cộng dồn số lượng; nếu không trùng, tạo mới một `CartItem`.
+7. Lưu trạng thái giỏ vào `localStorage`, hiển thị thông báo ngắn (Toast) xác nhận thành công.
 
-**Luồng chính**
+---
 
-1. Khách chọn size, các topping (nếu có) và số lượng.
-2. Giao diện cập nhật đơn giá và thành tiền theo lựa chọn.
-3. Khách bấm “Thêm vào giỏ”.
-4. Hệ thống kiểm tra tính hợp lệ (đã chọn size, số lượng trong giới hạn, số topping trong giới hạn).
-5. Hệ thống tìm dòng giỏ trùng (cùng sản phẩm, size, tập topping, ghi chú); nếu có thì cộng dồn số lượng, nếu không thì tạo dòng mới.
-6. Hệ thống lưu giỏ vào localStorage, cập nhật badge và hiện thông báo “Đã thêm vào giỏ”.
+## 4. Yêu cầu chức năng – Phân hệ Giỏ hàng (FR-CART)
 
-**Luồng thay thế**
+| Mã | Tên yêu cầu | MoSCoW | Tiêu chí chấp nhận kiểm chứng được (Acceptance Criteria) |
+| :--- | :--- | :---: | :--- |
+| **FR-CART-01** | Thêm sản phẩm kèm tùy chọn vào giỏ | **Must** | Thêm Cà phê sữa (Size M, 2 topping, SL 2) → Giỏ hàng xuất hiện chính xác 1 dòng với các thông số đã chọn. |
+| **FR-CART-02** | Ràng buộc dữ liệu đầu vào khi thêm | **Must** | Chưa chọn size mà bấm thêm → Chặn thao tác và hiển thị lỗi cảnh báo cạnh nhóm chọn size. |
+| **FR-CART-03** | Gộp dòng sản phẩm trùng cấu hình | **Must** | Thêm 2 lần cùng một món y hệt nhau → Tự động gộp thành 1 dòng với số lượng cộng dồn; nếu khác ghi chú → Tách thành 2 dòng riêng. |
+| **FR-CART-04** | Hiển thị chi tiết danh sách giỏ hàng | **Must** | Màn hình giỏ hàng hiển thị đầy đủ: ảnh thu nhỏ, tên món, biến thể size, danh sách topping, ghi chú, đơn giá và thành tiền từng dòng. |
+| **FR-CART-05** | Tăng/giảm số lượng từng dòng | **Must** | Bấm nút `+`/`-` làm thay đổi số lượng lập tức và cập nhật tổng tiền; nút `+` bị vô hiệu hóa khi chạm giới hạn `MaxCups` (`BR-02`). |
+| **FR-CART-06** | Tính toán tổng tạm tính tự động | **Must** | Mọi thay đổi về số lượng hoặc dòng sản phẩm đều làm cập nhật chính xác tổng tạm tính theo công thức `BR-01`. |
+| **FR-CART-07** | Lưu trữ bền vững phía Client | **Must** | Thêm sản phẩm vào giỏ → Tải lại trang (F5) hoặc đóng mở lại trình duyệt → Giỏ hàng vẫn được khôi phục nguyên vẹn. |
+| **FR-CART-08** | Chỉnh sửa cấu hình món trong giỏ | **Must** | Cho phép mở lại bảng tùy chỉnh để đổi Size hoặc Topping của món đang nằm trong giỏ và tự động tính lại đơn giá. |
+| **FR-CART-09** | Đồng bộ và xác thực giỏ hàng qua API | **Must** | Gọi `POST /cart/validate` khi mở giỏ hàng để đối chiếu giá mới nhất và kiểm tra tình trạng nguyên liệu từ backend. |
+| **FR-CART-10** | Cảnh báo khi thay đổi giá từ Server | **Must** | Nếu giá sản phẩm ở database thay đổi, hệ thống hiển thị thông báo rõ ràng tại dòng giỏ tương ứng và cập nhật lại tổng tiền. |
+| **FR-CART-11** | Xóa dòng hoặc làm trống giỏ hàng | **Must** | Bấm nút xóa hoặc giảm số lượng về 0 có hộp thoại xác nhận nhanh; nút "Xóa tất cả" làm sạch giỏ về trạng thái rỗng. |
+| **FR-CART-12** | Giới hạn sức chứa giỏ hàng | **Should** | Giới hạn tối đa 30 dòng sản phẩm khác nhau trong một giỏ và tối đa 5 topping cho mỗi món. |
+| **FR-CART-13** | Tự động làm sạch giỏ sau khi đặt đơn | **Must** | Ngay khi nhận phản hồi tạo đơn thành công từ `POST /orders`, giỏ hàng được làm rỗng hoàn toàn ở client. |
+| **FR-CART-14** | Áp dụng mã giảm giá (Preview) | **Could** | Cho phép nhập mã khuyến mãi tại giỏ để xem trước số tiền được khấu trừ trước khi sang trang thanh toán. |
+| **FR-CART-15** | Kiểm tra đăng nhập khi chuyển đặt đơn | **Must** | Nhấn "Tiến hành đặt đơn": nếu chưa đăng nhập → chuyển hướng sang trang Login kèm tham số redirect; nếu đã đăng nhập → chuyển sang `/checkout`. |
 
-* **A1:** Khách bấm “Thêm vào giỏ” khi chưa chọn size → hiện lỗi cạnh nhóm size, giữ nguyên màn hình, không thêm.
-* **A2:** Cộng dồn làm số lượng vượt 20 → đặt về 20 và báo “Tối đa 20 ly mỗi món”.
+---
 
-**Luồng ngoại lệ**
 
-* **E1:** Sản phẩm hoặc topping vừa hết hàng khi đang chọn → vô hiệu hóa nút, hiện “Tạm hết hàng”.
-* **E2:** localStorage không ghi được → vẫn giữ giỏ trong bộ nhớ phiên và báo giỏ có thể mất khi tải lại trang.
+## 5. Yêu cầu giao diện người dùng (FR-UI)
 
-## 4. Yêu cầu chức năng – Giỏ hàng
+Phạm vi giao diện bao gồm 5 màn hình chính: `SCR-01` (Menu), `SCR-02` (Chi tiết sản phẩm), `SCR-03` (Giỏ hàng), `SCR-04` (Xác nhận đặt đơn), `SCR-05` (Trạng thái rỗng / Lỗi / PWA).
 
-| Mã | Yêu cầu | Ưu tiên | Tiêu chí chấp nhận |
-| --- | --- | --- | --- |
-| FR-CART-01 | Thêm món vào giỏ kèm size, topping và số lượng | Must | Chọn Cà phê sữa, size M, 2 topping, SL 2 → giỏ có đúng 1 dòng với các giá trị đó |
-| FR-CART-02 | Kiểm tra dữ liệu trước khi thêm: size bắt buộc, phải đủ nguyên liệu| Must | Thiếu size → không thêm và có thông báo lỗi; gọi số ly nhiều hơn số nguyên liệu đang có -> thông báo lỗi |
-| FR-CART-03 | Gộp dòng trùng (cùng sản phẩm, size, tập topping, ghi chú) | Must | Thêm cùng cấu hình 2 lần → 1 dòng, SL cộng dồn; khác topping → 2 dòng |
-| FR-CART-04 | Hiển thị giỏ: tên, ảnh, size, topping, đơn giá, số lượng, thành tiền từng dòng | Must | Mỗi dòng hiển thị đủ 7 trường; thứ tự theo thời điểm thêm |
-| FR-CART-05 | Tăng/giảm số lượng từng dòng; giảm về 0 thì hỏi xác nhận xóa | Must | Bấm “+” tăng 1 và tổng cập nhật ngay; giảm từ 1 xuống 0 hiện hộp thoại xác nhận |
-| FR-CART-06 | Xóa một dòng khỏi giỏ | Must | Dòng biến mất, tổng cập nhật, badge giảm tương ứng |
-| FR-CART-07 | Tính tạm tính theo công thức BR-01 | Must | Với dữ liệu mẫu, tổng hiển thị bằng tổng tính tay; làm tròn không phát sinh |
-| FR-CART-08 | Giữ giỏ sau khi tải lại trang, đóng và mở lại trình duyệt, và sau khi đăng nhập | Should | Thêm món → tải lại → giỏ không đổi; đăng nhập xong giỏ vẫn còn |
-| FR-CART-09 | Kiểm tra hết hàng/ngừng bán khi mở giỏ và khi bấm đặt đơn | Must | Món hết hàng bị đánh dấu “Hết hàng”, nút Đặt đơn bị khóa cho đến khi xóa hoặc đổi món |
-| FR-CART-10 | Khi giá server khác giá trong giỏ, cập nhật giá mới và thông báo cho khách trước khi tiếp tục | Must | Đổi giá trong DB → mở giỏ → hiện giá mới và thông báo thay đổi; tổng khớp giá mới |
-| FR-CART-11 | Bấm “Đặt đơn” khi chưa đăng nhập thì chuyển đến đăng nhập, sau đó quay lại giỏ với dữ liệu nguyên vẹn | Must | Giỏ trước và sau đăng nhập giống nhau từng dòng |
-| FR-CART-12 | Làm trống toàn bộ giỏ có xác nhận | Should | Sau xác nhận giỏ rỗng và hiện trạng thái giỏ trống |
-| FR-CART-13 | Ghi chú cho từng món (tối đa 100 ký tự) | Could | Ghi chú lưu cùng dòng và hiển thị trong giỏ |
-| FR-CART-14 | Nhập mã khuyến mãi tại giỏ | Could | Mã hợp lệ làm giảm tổng theo quy tắc Promotion; mã sai báo lỗi rõ ràng |
-| FR-CART-15 | Đồng bộ giỏ giữa nhiều thiết bị | Won’t (MVP) | Không thực hiện trong MVP |
+| Mã | Tên yêu cầu giao diện | MoSCoW | Tiêu chí chấp nhận kiểm chứng được (Acceptance Criteria) |
+| :--- | :--- | :---: | :--- |
+| **FR-UI-01** | Bố cục Mobile-First chuẩn PWA | **Must** | Kiểm tra trên viewport từ `360px` đến `1440px`: hiển thị mượt mà, không bị tràn màn hình hay xuất hiện thanh cuộn ngang. |
+| **FR-UI-02** | Hiển thị danh mục & thẻ sản phẩm | **Must** | Dữ liệu từ `GET /products` hiển thị đúng danh mục, hình ảnh, giá và trạng thái mờ "Hết hàng" nếu nguyên liệu không đủ. |
+| **FR-UI-03** | Tùy chỉnh sản phẩm (Bottom Sheet / Modal) | **Must** | Giao diện chọn size dạng radio bắt buộc, topping dạng checkbox; giá tiền thay đổi động ngay khi người dùng chọn tùy chọn. |
+| **FR-UI-04** | Thanh giỏ hàng nổi (Floating Cart Bar) | **Must** | Khi `totalItems > 0`, thanh tóm tắt số lượng và tổng tiền xuất hiện cố định ở đáy màn hình Menu. |
+| **FR-UI-05** | Giao diện màn hình Giỏ hàng (`SCR-03`) | **Must** | Hiển thị rõ danh sách từng dòng sản phẩm kèm nút tăng giảm số lượng, nút xóa và bảng tổng kết thanh toán ở cuối màn hình. |
+| **FR-UI-06** | Trạng thái rỗng thân thiện (Empty State) | **Must** | Khi giỏ hàng trống (`totalItems == 0`), hiển thị icon minh họa, thông báo "Giỏ hàng trống" và nút bấm điều hướng quay lại Menu. |
+| **FR-UI-07** | Hiển thị trạng thái Loading (Skeleton UI) | **Must** | Khi gọi API tải menu hoặc đồng bộ giỏ, hiển thị khung Skeleton thay vì màn hình trắng trơn. |
+| **FR-UI-08** | Xử lý lỗi & Nút Thử lại (Error Boundary) | **Must** | Mất kết nối mạng hoặc lỗi server: hiển thị thông báo lỗi thân thiện kèm nút "Thử lại", ứng dụng không bị crash. |
+| **FR-UI-09** | Phản hồi tương tác tức thì (Toast Messages) | **Should** | Thông báo ngắn xuất hiện khi thêm món thành công hoặc đạt giới hạn số lượng và tự biến mất sau 3 giây. |
+| **FR-UI-10** | Hỗ trợ PWA & Web App Manifest | **Should** | Cung cấp `manifest.json`, icon chuẩn và service worker để ứng dụng đạt chuẩn cài đặt lên màn hình chính (Add to Home Screen). |
+| **FR-UI-11** | Kiểm tra dữ liệu biểu mẫu trực tiếp | **Must** | Các trường nhập liệu thông báo lỗi ngay bên dưới bằng tiếng Việt khi dữ liệu không hợp lệ. |
+| **FR-UI-12** | Vô hiệu hóa nút khi đang xử lý (Loading State) | **Must** | Nút bấm gửi yêu cầu đặt đơn tự động chuyển sang trạng thái loading và bị vô hiệu hóa để chặn double-click. |
+| **FR-UI-13** | Hỗ trợ khả năng truy cập cơ bản (A11y) | **Could** | Vùng chạm tối thiểu trên mobile đạt chuẩn `44x44px`, độ tương phản màu chữ đạt chuẩn WCAG AA ($\ge 4.5:1$). |
+| **FR-UI-14** | Đa ngôn ngữ | **Won't** | Chỉ hỗ trợ tiếng Việt cho phiên bản MVP. |
 
-## 5. Quy tắc nghiệp vụ
+---
 
-| Mã | Quy tắc |
-| --- | --- |
-| BR-01 | Đơn giá dòng = giá gốc + phụ thu size + tổng giá topping. Thành tiền dòng = đơn giá dòng × số lượng. Tạm tính = tổng thành tiền các dòng |
-| BR-02 | Số ly tối đa của một dòng món trong giỏ: Là giá trị nhỏ nhất (làm tròn xuống số nguyên), xét trên mọi nguyên liệu cấu thành món đó, của phép chia:
-Số ly tối đa = min(nguyên liệu còn lại/ lượng dùng cho 1 ly)
-Lượng dùng cho 1 ly: Bao gồm định lượng nguyên liệu theo công thức sản phẩm (ứng với size đã chọn) cộng với định lượng của các topping đi kèm.
+## 6. Yêu cầu phi chức năng (NFR-CART & NFR-UI)
 
-Nguyên liệu còn lại: Bằng tổng tồn kho hiện tại của nguyên liệu trừ đi tổng lượng nguyên liệu đã bị chiếm dụng bởi tất cả các dòng món khác đang có trong giỏ hàng.
+| Mã | Nhóm chất lượng | Mô tả yêu cầu chi tiết | MoSCoW | Tiêu chí chấp nhận kiểm chứng được (Acceptance Criteria) |
+| :--- | :--- | :--- | :---: | :--- |
+| **NFR-UI-01** | Hiệu năng tải trang (Lighthouse) | Tốc độ hiển thị nội dung đầu tiên trên thiết bị di động phải nhanh. | **Must** | Đo qua Google Lighthouse Mobile: **FCP $\le 1.8\text{s}$** và **LCP $\le 2.5\text{s}$**. |
+| **NFR-UI-02** | Độ mượt giao diện (INP) | Các thao tác chạm/click trên giao diện giỏ hàng phải phản hồi tức thì. | **Must** | Thời gian phản hồi tương tác **INP $\le 200\text{ms}$**; cuộn danh sách mượt mà không giật khung hình. |
+| **NFR-UI-03** | Khả năng tương thích trình duyệt | Hoạt động ổn định trên các trình duyệt hiện đại phổ biến. | **Must** | Kiểm thử thành công trên Chrome (v120+), Safari (iOS 16+) và Edge mới nhất. |
+| **NFR-UI-04** | Tính khả dụng (Usability Test) | Người dùng mới dễ dàng hoàn thành luồng chọn món và đưa vào giỏ. | **Should** | Thử nghiệm với 3 người dùng: 100% hoàn thành việc thêm 2 món có topping vào giỏ trong $\le 60\text{ giây}$. |
+| **NFR-UI-05** | Tính nhất quán thiết kế (Design Tokens) | Giao diện sử dụng thống nhất bộ biến màu sắc, font chữ và bo góc. | **Should** | Toàn bộ component xây dựng bằng Tailwind CSS config chung, không hardcode mã màu rời rạc. |
+| **NFR-CART-01** | Hiệu năng API Kiểm tra giỏ | API đồng bộ và xác thực giỏ hàng phản hồi nhanh chóng. | **Must** | Với giỏ hàng 10 dòng, thời gian phản hồi của `POST /cart/validate` (p95) **$\le 300\text{ms}$** trên môi trường Docker. |
+| **NFR-CART-02** | Độ tin cậy dữ liệu Client | Tránh lỗi hỏng dữ liệu giỏ hàng (`localStorage corruption`). | **Must** | Nếu `localStorage` bị sửa sai cú pháp JSON, ứng dụng tự động bắt lỗi và reset giỏ an toàn, không làm crash app. |
+| **NFR-CART-03** | Bảo mật đầu vào (XSS Sanitization) | Ngăn chặn tấn công mã độc qua trường ghi chú sản phẩm. | **Must** | Nhập payload chứa thẻ script vào ô ghi chú → Giao diện tự escape HTML an toàn. |
+| **NFR-CART-04** | Tối ưu dung lượng lưu trữ | Cấu trúc dữ liệu giỏ hàng gọn nhẹ để đọc/ghi bộ nhớ nhanh. | **Should** | Kích thước JSON giỏ hàng tối đa (30 dòng) **$\le 15\text{KB}$**, thời gian đọc/ghi `localStorage` < 5ms. |
 
-Ràng buộc số lượng: Khách hàng chỉ được order 30 món khác nhau(mỗi món = 1 dòng). Mỗi dòng chỉ được order số lượng nhất định được tính theo công thức Số ly tối đa|
-| BR-03 | Server là nguồn giá đúng. Giá trong giỏ chỉ để hiển thị; khi tạo đơn, server tính lại toàn bộ và bỏ qua giá do client gửi |
-| BR-04 | Chỉ khách đã đăng nhập (JWT hợp lệ) mới tạo được đơn; khách chưa đăng nhập vẫn được dùng giỏ |
-| BR-05 | Giỏ không được chứa món đã ngừng bán hoặc hết hàng khi chuyển sang đặt đơn |
+---
 
-## 6. Yêu cầu giao diện người dùng
+## 7. Giao diện lập trình ứng dụng (API Contracts)
 
-### 6.1 Nguyên tắc chung
+Các endpoint tích hợp chính cho phân hệ Giỏ hàng và Giao diện:
+1. **`GET /products` & `GET /products/:id`**: Trả về danh sách/chi tiết sản phẩm, size, topping, công thức định lượng (`Recipe`) và tồn kho nguyên liệu (`stockQty`) để tính `MaxCups` (`BR-02`).
+2. **`POST /cart/validate`**: Nhận danh sách các dòng giỏ hàng từ client, thực hiện đối chiếu giá hiện tại, kiểm tra tồn kho và trả về kết quả validate chi tiết cho từng dòng.
+3. **`POST /orders`**: Nhận payload đặt đơn kèm JWT Token từ client, thực hiện khóa giao dịch, tính toán lại giá chính xác ở server và trừ kho nguyên liệu.
 
-* Thiết kế mobile-first, bố cục cơ sở 360 px, mở rộng lên máy tính bảng và desktop.
-* Dùng chung bộ thành phần (nút, thẻ sản phẩm, hộp thoại, thông báo) và design tokens (màu, cỡ chữ, khoảng cách).
-* Tiền hiển thị theo dạng 45.000 ₫; thông báo và nhãn bằng tiếng Việt.
+---
 
-### 6.2 Danh sách màn hình
+## 8. Mô hình dữ liệu Giỏ hàng
 
-| Mã | Màn hình | Thành phần chính | FR liên quan |
-| --- | --- | --- | --- |
-| SCR-01 | Menu | Thanh danh mục, thẻ sản phẩm, badge giỏ | FR-UI-01, 03 |
-| SCR-02 | Chi tiết sản phẩm | Chọn size, topping, số lượng, giá động, nút Thêm vào giỏ | FR-UI-02, 06 |
-| SCR-03 | Giỏ hàng | Danh sách dòng, bộ chỉnh số lượng, thanh tổng tiền cố định, nút Đặt đơn | FR-UI-04, 05, 10 |
-| SCR-04 | Đăng nhập / Đăng ký | Biểu mẫu có kiểm tra dữ liệu | FR-UI-08 |
-| SCR-05 | Xác nhận đơn và theo dõi | Thanh trạng thái đơn | FR-UI-11 |
+* **`CartItem`**: `id` (UUID), `productId`, `sizeId`, `toppingIds[]` (đã sắp xếp), `quantity`, `note`, `unitPriceSnapshot`, `addedAt`.
+* **`Cart`**: `items[]` (tối đa 30 phần tử), `subtotal`.
+* **Mối quan hệ dữ liệu:** Giỏ hàng nằm hoàn toàn ở client (`localStorage`). Khi tạo đơn, các `CartItem` được chuyển đổi thành danh sách `OrderItem` phía backend để lưu vào cơ sở dữ liệu PostgreSQL.
 
-### 6.3 Yêu cầu chức năng giao diện
+---
 
-| Mã | Yêu cầu | Ưu tiên | Tiêu chí chấp nhận |
-| --- | --- | --- | --- |
-| FR-UI-01 | Màn hình Menu hiển thị sản phẩm theo danh mục, có trạng thái loading, empty và error | Must | Giả lập API chậm → thấy skeleton; trả mảng rỗng → thấy thông báo trống; API lỗi → có nút Thử lại |
-| FR-UI-02 | Chi tiết sản phẩm cho chọn size (bắt buộc), topping, số lượng; giá cập nhật ngay khi đổi lựa chọn | Must | Đổi size → đơn giá và thành tiền đổi trong vòng 100 ms, không gọi lại API |
-| FR-UI-03 | Biểu tượng giỏ ở thanh điều hướng có badge tổng số ly, cập nhật tức thì | Must | Thêm 2 ly → badge tăng 2; giỏ rỗng → ẩn badge |
-| FR-UI-04 | Màn hình Giỏ hiển thị danh sách dòng và thanh tổng tiền cố định ở cuối màn hình cùng nút Đặt đơn | Must | Cuộn danh sách dài vẫn thấy tổng tiền và nút Đặt đơn |
-| FR-UI-05 | Giỏ rỗng hiển thị hình minh họa, lời nhắn và nút quay lại Menu | Must | Giỏ rỗng → nút Đặt đơn không xuất hiện |
-| FR-UI-06 | Phản hồi thao tác: thông báo sau khi thêm món, hộp thoại xác nhận khi xóa, hoàn tác xóa trong 5 giây | Must (thông báo, xác nhận); Should (hoàn tác) | Xóa món → có hộp thoại; nếu bấm Hoàn tác trong 5 giây, món trở lại đúng vị trí |
-| FR-UI-07 | Mọi màn hình gọi API đều có trạng thái loading và lỗi kèm cách thử lại | Must | Ngắt mạng → hiện thông báo lỗi và nút Thử lại; dữ liệu giỏ không mất |
-| FR-UI-08 | Biểu mẫu kiểm tra dữ liệu ngay dưới từng ô nhập, bằng tiếng Việt | Must | Email sai định dạng → thông báo ngay khi rời ô; nút gửi bị khóa khi còn lỗi |
-| FR-UI-09 | Thanh điều hướng dưới cùng gồm Menu, Giỏ hàng, Đơn hàng, Tài khoản | Should | Mỗi mục dẫn đúng màn hình; mục hiện tại được tô nổi bật |
-| FR-UI-10 | Nút gửi (Đặt đơn, Thanh toán) bị vô hiệu hóa và hiện trạng thái đang xử lý trong lúc gửi | Must | Bấm liên tiếp 5 lần chỉ phát sinh 1 yêu cầu |
-| FR-UI-11 | Màn hình theo dõi đơn hiển thị các bước trạng thái và bước hiện tại | Should | Trạng thái đơn đổi → giao diện cập nhật sau lần tải lại hoặc làm mới |
-| FR-UI-12 | Ứng dụng cài được lên màn hình chính (PWA: manifest, biểu tượng, service worker cơ bản) | Should | Lighthouse PWA báo installable; mở từ biểu tượng cài đặt chạy toàn màn hình |
-| FR-UI-13 | Chế độ tối | Could | Giao diện theo cài đặt hệ thống, vẫn đạt tương phản tối thiểu |
-| FR-UI-14 | Đa ngôn ngữ | Won’t (MVP) | Chỉ hỗ trợ tiếng Việt |
+## 9. Ma trận truy vết (Traceability Matrix – Trích mẫu)
 
-## 7. Yêu cầu phi chức năng
+| Mã yêu cầu | Use-case tương ứng | Sơ đồ thiết kế liên quan | API / Thành phần mã nguồn | Test Case kiểm thử |
+| :--- | :--- | :--- | :--- | :--- |
+| **FR-CART-01** | UC-C1 (Thêm món) | Activity-01, Class-01 | `useCartStore.addItem()` (Next.js) | `UNIT-CART-01` (Gộp dòng trùng) |
+| **FR-CART-02** | UC-C1 (Kiểm tra dữ liệu) | BR-02 (`MaxCups`) | `calculateMaxCups()` (Shared) | `UNIT-CART-02` (Chặn quá tồn kho) |
+| **FR-CART-09** | UC-C5 (Đồng bộ giỏ) | Sequence-Checkout | `POST /cart/validate` (NestJS) | `INT-CART-01` (Kiểm tra validate giá/kho) |
+| **FR-UI-01** | SCR-01 (Menu Responsive) | Deployment-01 | `MenuPage` (Next.js PWA) | `UI-RESP-01` (Kiểm tra đa màn hình) |
+| **FR-UI-07** | SCR-01, SCR-03 (Loading) | Activity-01 | `CartSkeleton` component | `UI-STATE-01` (Kiểm tra Skeleton) |
 
-| Mã | Nhóm | Yêu cầu | Ưu tiên | Tiêu chí chấp nhận |
-| --- | --- | --- | --- | --- |
-| NFR-UI-01 | Tương thích | Bố cục hiển thị đúng từ 360 đến 1440 px, không cuộn ngang | Must | Kiểm tra ở 360, 768, 1280 px: không tràn nội dung |
-| NFR-UI-02 | Trình duyệt | Hỗ trợ 2 phiên bản mới nhất của Chrome, Edge, Safari (kể cả iOS) | Must | Luồng Menu → Giỏ chạy đúng trên các trình duyệt này |
-| NFR-UI-03 | Hiệu năng | Màn hình Menu đạt LCP ≤ 2,5 s trên mạng 4G giả lập | Should | Lighthouse mobile ghi nhận LCP ≤ 2,5 s trên dữ liệu mẫu |
-| NFR-UI-04 | Hiệu năng | Thao tác trên giỏ (thêm, sửa, xóa) phản hồi trên giao diện ≤ 100 ms | Should | Đo bằng công cụ trình duyệt trên dữ liệu 30 dòng |
-| NFR-UI-05 | Khả năng truy cập | Tương phản chữ/nền ≥ 4,5:1; vùng chạm ≥ 44×44 px; nút và ô nhập có nhãn | Should | Kiểm tra Lighthouse Accessibility ≥ 90 và đo thủ công vùng chạm |
-| NFR-UI-06 | Tính khả dụng | Từ Menu đến thêm một món vào giỏ không quá 3 lần chạm | Should | Thử nghiệm với 3 người dùng không thuộc nhóm, đều hoàn thành |
-| NFR-UI-07 | Nhất quán | Dùng chung design tokens và thành phần cho mọi màn hình | Should | Không có màu hoặc cỡ chữ cố định ngoài tokens trong mã giao diện |
-| NFR-CART-01 | Bảo mật | Server không tin giá từ client; mọi dữ liệu giỏ gửi lên được validate | Must | Gửi giá sai qua công cụ API → đơn vẫn tính theo giá server |
-| NFR-CART-02 | Bảo mật | Không lưu token hay thông tin nhạy cảm cùng dữ liệu giỏ trong localStorage | Must | Kiểm tra bộ nhớ trình duyệt: giỏ chỉ có mã, số lượng, tùy chọn, giá hiển thị |
-| NFR-CART-03 | Độ tin cậy | Lỗi mạng hoặc API không làm mất giỏ | Must | Ngắt mạng khi kiểm tra giỏ → giỏ còn nguyên, có thông báo lỗi |
-| NFR-CART-04 | Hiệu năng | API kiểm tra giỏ có p95 ≤ 500 ms với giỏ 30 dòng | Should | Kiểm thử tải nhẹ trên môi trường local ghi nhận p95 ≤ 500 ms |
+---
 
-## 8. Giao diện với hệ thống (API)
+## 11. Các vấn đề mở và Rủi ro (Open Issues & Risks)
 
-Các endpoint dưới đây là đề xuất, sẽ được chốt cùng nhóm thiết kế kiến trúc.
-
-| Endpoint | Mục đích | FR liên quan |
-| --- | --- | --- |
-| GET /products | Danh sách sản phẩm cho Menu | FR-UI-01 |
-| GET /products/:id | Chi tiết, size, topping, tồn kho | FR-UI-02, FR-CART-02 |
-| POST /cart/validate | Gửi các dòng giỏ; trả về giá hiện tại, tình trạng còn hàng và tạm tính | FR-CART-09, 10 |
-| POST /auth/login | Đăng nhập để tiếp tục đặt đơn | FR-CART-11 |
-| POST /orders | Tạo đơn từ giỏ; server tính lại giá | BR-03, FR-CART-10 |
-
-## 9. Mô hình dữ liệu của giỏ hàng
-
-**CartItem**: productId, sizeId, toppingIds[], quantity, note, unitPriceSnapshot, addedAt.
-
-**Cart**: items[] (tối đa 30), subtotal (tính từ items).
-
-Quan hệ: một Cart chứa 0..30 CartItem; mỗi CartItem tham chiếu 1 Product, 1 size. Khi đặt đơn, mỗi CartItem được chuyển thành một OrderItem (giá lấy lại từ server) trong Order. Cart là cấu trúc phía client, không có bảng riêng trong PostgreSQL ở MVP.
-
-## 10. Truy vết (trích mẫu)
-
-| Mã yêu cầu | Use-case / User story | Thiết kế | Code / API | Test |
-| --- | --- | --- | --- | --- |
-| FR-CART-01 | UC-C1 | Activity-01, Class-01 | Cart store (web) | UI-T01 |
-| FR-CART-07 | UC-C2 | Class-01 | Hàm tính tổng (web, api) | UNIT-T02 |
-| FR-CART-10 | UC-C5 | Sequence-01 | POST /cart/validate | INT-T04 |
-| FR-UI-01 | US-01 Xem menu | Activity-01 | GET /products | API-T01, UI-T02 |
-| FR-UI-10 | UC-C5 | Sequence-01 | Nút gửi (web) | E2E-T01 |
-
-## 11. Rủi ro và vấn đề mở
-
-| Mã | Nội dung | Hướng xử lý |
-| --- | --- | --- |
-| OI-01 | Giỏ lưu ở client hay server (GS-01) | Quyết định bằng ADR ở Task 3.1; nếu chọn server, bổ sung bảng cart và endpoint tương ứng |
-| OI-02 | Khuyến mãi có vào MVP không (FR-CART-14) | Chốt cùng nhóm phụ trách Promotion trước Sprint 2 |
-| RK-01 | Giá đổi giữa lúc thêm và lúc đặt đơn gây khiếu nại | Đã xử lý bằng BR-03 và FR-CART-10 |
+| Mã | Nội dung vấn đề / Rủi ro | Hướng giải quyết đề xuất |
+| :--- | :--- | :--- |
+| **OI-01** | Vị trí lưu trữ giỏ hàng (Client vs Server) (`GS-01`) | Sẽ được chốt chính thức thông qua **ADR-002** trong thư mục `docs/architecture/adr/` tại Task 3.1. |
+| **OI-02** | Phạm vi tích hợp mã khuyến mãi (`FR-CART-14`) | Cần thống nhất với nhóm phụ trách Đặt đơn/Thanh toán trước khi bước vào Sprint 2. |
+| **OI-03** | Xác thực định lượng công thức nguyên liệu (`Recipe`) | Cần họp thống nhất cấu trúc dữ liệu trả về từ API `GET /products/:id` với nhóm Kho. |
+| **RK-01** | Biến động giá hoặc hết nguyên liệu giữa lúc chọn món và lúc bấm đặt đơn. | Đã được giảm thiểu triệt để thông qua cơ chế tự động validate qua API `POST /cart/validate` (`FR-CART-09`, `FR-CART-10`). |
