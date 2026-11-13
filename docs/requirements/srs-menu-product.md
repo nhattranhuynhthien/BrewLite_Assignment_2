@@ -106,7 +106,7 @@ Dùng dạng Given/When/Then để có thể viết test trực tiếp.
 | NFR-02 | – | Class-01 | Migration (CHECK, kiểu số nguyên) | MIG-T02 |
 | NFR-06 | – | – | Swagger/OpenAPI | API-T06 |
 
-Mã user story (US-xx), use-case (UC-xx) và mã test là **đề xuất**; TV2, TV4 và TV6 xác nhận khi hợp nhất SRS và điền `docs/traceability-matrix.md`.
+Mã user story (US-xx) và mã test trong bảng là **đề xuất**; mã FR/NFR chính thức được quản lý tại [SRS tổng quát](./srs.md).
 
 ## 5. Lịch sử thay đổi
 

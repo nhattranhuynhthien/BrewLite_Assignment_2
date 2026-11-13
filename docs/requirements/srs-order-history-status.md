@@ -8,9 +8,9 @@
 | Reviewer | TV5 |
 | Phạm vi | Lịch sử và chi tiết đơn của khách; theo dõi trạng thái; cập nhật trạng thái phục vụ của staff; hiệu năng và giao diện dễ sử dụng |
 | Đầu vào | D-01 và D-02 đã hoàn tất theo xác nhận của TV6; SRS đặt đơn và thanh toán dùng để thống nhất trạng thái và dữ liệu đơn |
-| Hợp nhất | TV2 hợp nhất vào SRS chung tại D-08 và chốt mã chính thức |
+| Hợp nhất | Mã chuẩn và yêu cầu đã hợp nhất tại [SRS tổng hợp](./srs.md); tài liệu này giữ tiêu chí chi tiết |
 
-Mã FR-40–FR-49 thuộc nhóm lịch sử/trạng thái đơn theo quy ước trong SRS menu. Tài liệu dùng FR-40–FR-44 và NFR-HIS-01–NFR-HIS-04 để không trùng mã của các nhóm khác; TV2 ánh xạ NFR sang mã chung khi hợp nhất. “Tính khả dụng” trong tài liệu này là tính dễ sử dụng của giao diện, không phải tỷ lệ uptime.
+Mã FR-40–FR-49 thuộc nhóm lịch sử/trạng thái đơn. Các mã NFR-HIS-01–NFR-HIS-04 là mã cục bộ; xem ánh xạ sang mã chuẩn trong [SRS tổng hợp](./srs.md). “Tính khả dụng” trong tài liệu này là tính dễ sử dụng của giao diện, không phải tỷ lệ uptime.
 
 Đây là đặc tả để triển khai và kiểm thử ở các task sau, không phải báo cáo tính năng đã chạy hoặc kết quả đo hiệu năng.
 

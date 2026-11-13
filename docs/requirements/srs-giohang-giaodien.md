@@ -6,6 +6,8 @@
 
 ---
 
+> Đây là đặc tả thành phần với mã cục bộ `FR-CRT-*`, `FR-UI-*`, `NFR-CRT-*` và `NFR-UI-*`. Mã chuẩn dùng toàn dự án và phần được chấp nhận theo kiến trúc client-only được ghi tại [SRS tổng hợp](./srs.md); yêu cầu đồng bộ giỏ qua database/nhiều thiết bị chưa thuộc MVP.
+
 ## 1. Yêu cầu Chức năng của Giỏ hàng (Cart - FR)
 
 Phần này đặc tả các chức năng quản lý giỏ hàng trực tuyến trên hệ thống BrewLite, cho phép khách hàng tương tác với các sản phẩm trước khi tiến hành thanh toán.
@@ -16,7 +18,7 @@ Phần này đặc tả các chức năng quản lý giỏ hàng trực tuyến 
 | **FR-CRT-02** | Xem danh sách giỏ hàng | **Must Have** | Hiển thị toàn bộ các món trong giỏ: hình ảnh, tên, tùy chọn, đơn giá, số lượng và tổng thành tiền tạm tính. | - Hiển thị đúng danh sách các món đã thêm.<br>- Tính chính xác tổng tiền = $\sum (\text{đơn giá sản phẩm} + \sum \text{topping}) \times \text{số lượng}$.<br>- Có thông báo rõ ràng nếu giỏ hàng trống. |
 | **FR-CRT-03** | Cập nhật số lượng sản phẩm | **Must Have** | Cho phép người dùng tăng, giảm số lượng hoặc nhập trực tiếp số lượng của từng mục trong giỏ. | - Thay đổi số lượng tự động cập nhật tổng tiền tạm tính.<br>- Giảm số lượng về 0 sẽ yêu cầu xác nhận xóa mục.<br>- Chặn số lượng âm hoặc vượt quá tồn kho. |
 | **FR-CRT-04** | Xóa sản phẩm khỏi giỏ hàng | **Must Have** | Cho phép người dùng xóa một mục riêng lẻ hoặc làm trống toàn bộ giỏ hàng (Clear Cart). | - Có hộp thoại xác nhận trước khi xóa.<br>- Làm mới giao diện và đưa giỏ hàng về trạng thái trống khi xóa hết. |
-| **FR-CRT-05** | Lưu trữ trạng thái giỏ hàng | **Should Have** | Lưu trữ tạm thời trạng thái giỏ hàng cho khách vãng lai (LocalStorage) và người dùng đăng nhập (Database). | - Khách vãng lai tắt trình duyệt mở lại vẫn giữ nguyên giỏ hàng.<br>- Khách đăng nhập đồng bộ giỏ hàng trên nhiều thiết bị. |
+| **FR-CRT-05** | Lưu trữ trạng thái giỏ hàng | **Should Have** | Lưu trạng thái giỏ trên client (LocalStorage) cho cả khách vãng lai và người dùng đăng nhập, theo quyết định client-only của SRS tổng hợp. | - Đóng trình duyệt rồi mở lại vẫn giữ giỏ trên cùng thiết bị/trình duyệt.<br>- Không yêu cầu lưu database hoặc đồng bộ nhiều thiết bị trong MVP. |
 | **FR-CRT-06** | Áp dụng mã khuyến mãi | **Could Have** | Cho phép người dùng nhập mã giảm giá tại trang giỏ hàng để giảm trừ tổng giá trị đơn hàng. | - Hệ thống kiểm tra tính hợp lệ của mã.<br>- Hiển thị số tiền được giảm và cập nhật lại tổng thanh toán. |
 
 ---
@@ -28,8 +30,8 @@ Phần này quy định các tiêu chuẩn chất lượng kỹ thuật, hiệu 
 | Mã yêu cầu | Tiêu chí / Hạng mục | Mức ưu tiên | Mô tả chi tiết & Chỉ số đo lường (Metrics) |
 | :--- | :--- | :--- | :--- |
 | **NFR-CRT-01** | Hiệu năng xử lý giỏ hàng | **Must Have** | Các thao tác thay đổi số lượng, thêm/xóa sản phẩm ở phía client phải phản hồi mượt mà với độ trễ giao diện dưới 100ms. |
-| **NFR-CRT-02** | Tính toàn vẹn dữ liệu giỏ hàng | **Must Have** | Dữ liệu giỏ hàng lưu trữ trong PostgreSQL hoặc Session không bị mất mát hay lệch lạc khi người dùng thao tác đồng thời nhiều tab trình duyệt. |
-| **NFR-CRT-03** | Bảo mật thông tin giỏ hàng | **Should Have** | Dỏ hàng của người dùng đã đăng nhập phải được bảo vệ thông qua JWT, ngăn chặn việc truy cập hoặc sửa đổi giỏ hàng của tài khoản khác. |
+| **NFR-CRT-02** | Tính toàn vẹn dữ liệu giỏ hàng | **Must Have** | Dữ liệu giỏ hàng client-side không bị âm thầm mất/lệch khi người dùng thao tác đồng thời nhiều tab trình duyệt. |
+| **NFR-CRT-03** | Bảo mật khi đặt đơn từ giỏ | **Should Have** | Không có API giỏ hàng server-side trong MVP client-only; khi gửi giỏ để tạo đơn, API phải xác thực JWT và xác định chủ đơn từ danh tính server, không tin `userId` client gửi. |
 
 ---
 
