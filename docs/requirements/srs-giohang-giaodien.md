@@ -98,7 +98,7 @@ BrewLite là ứng dụng đặt đồ uống mobile-first/PWA (Next.js, NestJS,
 | Mã | Yêu cầu | Ưu tiên | Tiêu chí chấp nhận |
 | --- | --- | --- | --- |
 | FR-CART-01 | Thêm món vào giỏ kèm size, topping và số lượng | Must | Chọn Cà phê sữa, size M, 2 topping, SL 2 → giỏ có đúng 1 dòng với các giá trị đó |
-| FR-CART-02 | Kiểm tra dữ liệu trước khi thêm: size bắt buộc, SL từ 1 đến 20, tối đa 5 topping | Must | Thiếu size → không thêm và có thông báo lỗi; SL 21 bị chặn |
+| FR-CART-02 | Kiểm tra dữ liệu trước khi thêm: size bắt buộc, phải đủ nguyên liệu| Must | Thiếu size → không thêm và có thông báo lỗi; gọi số ly nhiều hơn số nguyên liệu đang có -> thông báo lỗi |
 | FR-CART-03 | Gộp dòng trùng (cùng sản phẩm, size, tập topping, ghi chú) | Must | Thêm cùng cấu hình 2 lần → 1 dòng, SL cộng dồn; khác topping → 2 dòng |
 | FR-CART-04 | Hiển thị giỏ: tên, ảnh, size, topping, đơn giá, số lượng, thành tiền từng dòng | Must | Mỗi dòng hiển thị đủ 7 trường; thứ tự theo thời điểm thêm |
 | FR-CART-05 | Tăng/giảm số lượng từng dòng; giảm về 0 thì hỏi xác nhận xóa | Must | Bấm “+” tăng 1 và tổng cập nhật ngay; giảm từ 1 xuống 0 hiện hộp thoại xác nhận |
@@ -118,7 +118,13 @@ BrewLite là ứng dụng đặt đồ uống mobile-first/PWA (Next.js, NestJS,
 | Mã | Quy tắc |
 | --- | --- |
 | BR-01 | Đơn giá dòng = giá gốc + phụ thu size + tổng giá topping. Thành tiền dòng = đơn giá dòng × số lượng. Tạm tính = tổng thành tiền các dòng |
-| BR-02 | Mỗi dòng tối đa 20 ly; mỗi giỏ tối đa 30 dòng; mỗi món tối đa 5 topping |
+| BR-02 | Số ly tối đa của một dòng món trong giỏ: Là giá trị nhỏ nhất (làm tròn xuống số nguyên), xét trên mọi nguyên liệu cấu thành món đó, của phép chia:
+Số ly tối đa = min(nguyên liệu còn lại/ lượng dùng cho 1 ly)
+Lượng dùng cho 1 ly: Bao gồm định lượng nguyên liệu theo công thức sản phẩm (ứng với size đã chọn) cộng với định lượng của các topping đi kèm.
+
+Nguyên liệu còn lại: Bằng tổng tồn kho hiện tại của nguyên liệu trừ đi tổng lượng nguyên liệu đã bị chiếm dụng bởi tất cả các dòng món khác đang có trong giỏ hàng.
+
+Ràng buộc số lượng: Khách hàng chỉ được order 30 món khác nhau(mỗi món = 1 dòng). Mỗi dòng chỉ được order số lượng nhất định được tính theo công thức Số ly tối đa|
 | BR-03 | Server là nguồn giá đúng. Giá trong giỏ chỉ để hiển thị; khi tạo đơn, server tính lại toàn bộ và bỏ qua giá do client gửi |
 | BR-04 | Chỉ khách đã đăng nhập (JWT hợp lệ) mới tạo được đơn; khách chưa đăng nhập vẫn được dùng giỏ |
 | BR-05 | Giỏ không được chứa món đã ngừng bán hoặc hết hàng khi chuyển sang đặt đơn |
@@ -194,7 +200,7 @@ Các endpoint dưới đây là đề xuất, sẽ được chốt cùng nhóm t
 
 **Cart**: items[] (tối đa 30), subtotal (tính từ items).
 
-Quan hệ: một Cart chứa 0..30 CartItem; mỗi CartItem tham chiếu 1 Product, 1 size và 0..5 topping. Khi đặt đơn, mỗi CartItem được chuyển thành một OrderItem (giá lấy lại từ server) trong Order. Cart là cấu trúc phía client, không có bảng riêng trong PostgreSQL ở MVP.
+Quan hệ: một Cart chứa 0..30 CartItem; mỗi CartItem tham chiếu 1 Product, 1 size. Khi đặt đơn, mỗi CartItem được chuyển thành một OrderItem (giá lấy lại từ server) trong Order. Cart là cấu trúc phía client, không có bảng riêng trong PostgreSQL ở MVP.
 
 ## 10. Truy vết (trích mẫu)
 
@@ -212,5 +218,4 @@ Quan hệ: một Cart chứa 0..30 CartItem; mỗi CartItem tham chiếu 1 Produ
 | --- | --- | --- |
 | OI-01 | Giỏ lưu ở client hay server (GS-01) | Quyết định bằng ADR ở Task 3.1; nếu chọn server, bổ sung bảng cart và endpoint tương ứng |
 | OI-02 | Khuyến mãi có vào MVP không (FR-CART-14) | Chốt cùng nhóm phụ trách Promotion trước Sprint 2 |
-| OI-03 | Giới hạn 20 ly và 5 topping là giả định | Xác nhận với giảng viên hoặc khách hàng nghiệm thu |
 | RK-01 | Giá đổi giữa lúc thêm và lúc đặt đơn gây khiếu nại | Đã xử lý bằng BR-03 và FR-CART-10 |
