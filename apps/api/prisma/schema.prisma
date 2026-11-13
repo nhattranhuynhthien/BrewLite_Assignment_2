@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PAYMENT_FAILED
+  CANCELLED
+  PREPARING
+  READY
+  COMPLETED
+}
+
+enum PaymentMethod {
+  WALLET
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         UserRole @default(CUSTOMER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  orders       Order[]
+  idempotencyKeys IdempotencyKey[]
+
+  @@map("users")
+}
+
+model Category {
+  id       String    @id @default(uuid()) @db.Uuid
+  name     String    @unique
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String           @id @default(uuid()) @db.Uuid
+  categoryId    String           @map("category_id") @db.Uuid
+  name          String
+  description   String           @default("")
+  basePrice     Int              @map("base_price")
+  stockQuantity Int              @default(0) @map("stock_quantity")
+  isAvailable   Boolean          @default(true) @map("is_available")
+  category      Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  sizes         Size[]
+  toppings      ProductTopping[]
+  orderItems    OrderItem[]
+
+  @@map("products")
+}
+
+model Size {
+  id         String      @id @default(uuid()) @db.Uuid
+  productId  String      @map("product_id") @db.Uuid
+  name       String
+  extraPrice Int         @default(0) @map("extra_price")
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  orderItems OrderItem[]
+
+  @@unique([productId, name])
+  @@map("sizes")
+}
+
+model Topping {
+  id           String           @id @default(uuid()) @db.Uuid
+  name         String           @unique
+  extraPrice   Int              @map("extra_price")
+  isAvailable  Boolean          @default(true) @map("is_available")
+  products     ProductTopping[]
+  orderToppings OrderItemTopping[]
+
+  @@map("toppings")
+}
+
+model ProductTopping {
+  productId String  @map("product_id") @db.Uuid
+  toppingId String  @map("topping_id") @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  topping   Topping @relation(fields: [toppingId], references: [id], onDelete: Cascade)
+
+  @@id([productId, toppingId])
+  @@map("product_toppings")
+}
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  userId         String      @map("user_id") @db.Uuid
+  status         OrderStatus @default(PENDING_PAYMENT)
+  subtotal       Int
+  discountAmount Int        @default(0) @map("discount_amount")
+  totalAmount    Int        @map("total_amount")
+  note           String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  user           User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items          OrderItem[]
+  payments       Payment[]
+
+  @@index([userId, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String             @id @default(uuid()) @db.Uuid
+  orderId     String             @map("order_id") @db.Uuid
+  productId   String             @map("product_id") @db.Uuid
+  sizeId      String             @map("size_id") @db.Uuid
+  productName String             @map("product_name")
+  sizeName    String             @map("size_name")
+  unitPrice   Int                @map("unit_price")
+  quantity    Int
+  lineTotal   Int                @map("line_total")
+  order       Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  size        Size               @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  toppings    OrderItemTopping[]
+
+  @@map("order_items")
+}
+
+model OrderItemTopping {
+  id            String    @id @default(uuid()) @db.Uuid
+  orderItemId   String    @map("order_item_id") @db.Uuid
+  toppingId     String    @map("topping_id") @db.Uuid
+  toppingName   String    @map("topping_name")
+  extraPrice    Int       @map("extra_price")
+  orderItem     OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  topping       Topping   @relation(fields: [toppingId], references: [id], onDelete: Restrict)
+
+  @@map("order_item_toppings")
+}
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderId           String        @map("order_id") @db.Uuid
+  method            PaymentMethod
+  status            PaymentStatus @default(PENDING)
+  amount            Int
+  idempotencyKey    String        @unique @map("idempotency_key")
+  gatewayTransactionId String?    @map("gateway_transaction_id")
+  failureReason     String?       @map("failure_reason")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+  @@map("payments")
+}
+
+model IdempotencyKey {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  key            String
+  endpoint       String
+  requestHash    String            @map("request_hash")
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  expiresAt      DateTime          @map("expires_at")
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([status, createdAt])
+  @@map("idempotency_keys")
+}
+
+model MockGatewayTransaction {
+  id                    String        @id @default(uuid()) @db.Uuid
+  idempotencyKey        String        @unique @map("idempotency_key")
+  status                PaymentStatus
+  scenario              String
+  gatewayTransactionId  String        @unique @map("gateway_transaction_id")
+  failureReason         String?       @map("failure_reason")
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  @@map("mock_gateway_transactions")
+}
