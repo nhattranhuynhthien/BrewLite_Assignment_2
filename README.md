@@ -110,6 +110,8 @@ CONTRIBUTING.md # Quy ước branch, commit, pull request và Definition of Done
 ## Tài liệu
 
 - [Bối cảnh, stakeholder và phạm vi](docs/requirements/context-and-scope.md)
+- [SRS tổng quát – mã FR/NFR chuẩn](docs/requirements/srs.md)
+- [Use-case tổng quát (PlantUML)](docs/diagrams/use-case-overview.puml) · [SVG](docs/diagrams/use-case-overview.svg)
 - [SRS: Menu và sản phẩm](docs/requirements/srs-menu-product.md)
 - [ADR 003: ORM, schema và migration](docs/architecture/adr/003-orm-schema-catalog.md)
 - [Sơ đồ domain](docs/diagrams/class-domain.svg)

@@ -1,0 +1,76 @@
+@startuml
+skinparam DefaultTextAlignment center
+skinparam ActivityBackgroundColor #3498DB
+skinparam ActivityBorderColor #2980B9
+skinparam ActivityFontColor White
+skinparam SwimlaneBorderColor #333333
+
+|Hệ thống|
+start
+:Mở menu nước;
+
+|Khách hàng|
+:Chọn món;
+
+|Hệ thống|
+:Kiểm tra nguyên vật liệu;
+if (Đủ nguyên vật liệu?) then (Không)
+    :Thông báo hết đồ uống;
+    stop
+else (Có)
+    :Hiển thị thông tin đồ uống;
+    :Kiểm tra trạng thái đăng nhập;
+    
+    if (Đã đăng nhập?) then (Chưa đăng nhập)
+        |Khách hàng|
+        :Hiển thị giao diện đăng nhập;
+        :Nhập tài khoản, mật khẩu;
+        
+        |Hệ thống|
+        :Kiểm tra thông tin tài khoản, mật khẩu;
+        if (Đúng?) then (Sai)
+            :Thông báo đăng nhập thất bại;
+            stop
+        else (Đúng)
+        endif
+    else (Đã đăng nhập)
+    endif
+    
+    |Hệ thống|
+    :Yêu cầu xác nhận thông tin đồ uống;
+    
+    |Khách hàng|
+    if (Lựa chọn?) then (Chọn Hủy)
+        |Hệ thống|
+        :Hủy giao dịch;
+        stop
+    else (Chọn Xác nhận)
+        |Hệ thống|
+        :Hiển thị hóa đơn và yêu cầu thanh toán;
+        
+        |Khách hàng|
+        :Thanh toán;
+        
+        |Hệ thống|
+        repeat :Kiểm tra kết quả thanh toán;
+            if (Thanh toán thành công?) then (Thành công)
+                #3498DB:Thông báo thanh toán thành công;
+                break
+            else (Thất bại)
+                :Thông báo thanh toán thất bại;
+                |Khách hàng|
+                :Thanh toán lại;
+                |Hệ thống|
+            endif
+        repeat while (Tiếp tục thanh toán?) is (Thất bại)
+        
+        :Cập nhật tiến trình pha chế nước;
+        
+        |Khách hàng|
+        :Nhận đồ uống;
+        
+        |Hệ thống|
+        stop
+    endif
+endif
+@enduml
