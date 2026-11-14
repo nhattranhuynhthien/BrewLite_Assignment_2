@@ -11,8 +11,8 @@
 
 ## 1. Quy ước mã
 
-- Mã `FR-01`…`FR-49` và `NFR-01`…`NFR-14` là mã chuẩn, duy nhất cho toàn dự án.
-- Các dải FR giữ nguyên quy ước phân nhóm: `01–09` menu/sản phẩm; `10–19` giỏ hàng; `20–29` xác thực; `30–39` đặt hàng/thanh toán; `40–49` lịch sử/trạng thái đơn. Mã chưa dùng được để trống, không tái sử dụng cho yêu cầu khác.
+- Mã `FR-01`…`FR-39` và `NFR-01`…`NFR-14` là mã chuẩn, duy nhất cho toàn dự án.
+- Các dải FR giữ nguyên quy ước phân nhóm: `01–09` menu/sản phẩm; `10–19` giỏ hàng; `20–24` xác thực; `25–34` đặt hàng/thanh toán; `34–39` lịch sử/trạng thái đơn. Mã chưa dùng được để trống, không tái sử dụng cho yêu cầu khác.
 - NFR được đánh số lại liên tục để loại bỏ các mã cục bộ trùng hoặc không đồng nhất. Bảng ánh xạ NFR cũ ở mục 4 phục vụ truy vết; chỉ mã NFR chuẩn được dùng khi tạo yêu cầu mới.
 - FR-09 là mã Won't được giữ duy nhất để lưu quyết định loại bỏ quản trị catalog; Won't và nội dung ngoài phạm vi khác không được cấp mã FR/NFR.
 
@@ -75,7 +75,7 @@ Giỏ hàng chỉ lưu phía client (ví dụ LocalStorage), theo kiến trúc h
 - **AC-19.1:** Mobile có bottom navigation, desktop có header navigation; chuyển trang phía client không làm mất trạng thái cần giữ của ứng dụng/giỏ hàng.
 
 
-### 3.3 Xác thực và phân quyền (`FR-20`–`FR-29`)
+### 3.3 Xác thực và phân quyền (`FR-20`–`FR-24`)
 
 | Mã | Yêu cầu | Ưu tiên |
 |---|---|---|
@@ -85,34 +85,32 @@ Giỏ hàng chỉ lưu phía client (ví dụ LocalStorage), theo kiến trúc h
 | FR-23 | Hệ thống chỉ cho khách hàng truy cập đơn của chính họ; không tin `userId` do client gửi để xác định chủ đơn. | Must |
 | FR-24 | Hệ thống giới hạn thao tác cập nhật trạng thái đơn cho nhân viên có vai trò STAFF. | Must |
 
-FR-25…FR-29 để trống. Đăng xuất phía client kết thúc phiên bằng cách xóa thông tin xác thực.
-
-### 3.4 Đặt hàng và thanh toán (`FR-30`–`FR-39`)
+### 3.4 Đặt hàng và thanh toán (`FR-25`–`FR-34`)
 
 | Mã | Yêu cầu | Ưu tiên |
 |---|---|---|
-| FR-30 | Khách đã đăng nhập có thể tạo đơn từ giỏ hàng hợp lệ; chủ đơn lấy từ JWT và đơn mới ở trạng thái `PENDING_PAYMENT`. | Must |
-| FR-31 | Server tính tổng tiền và lưu snapshot tên, giá, size, topping của từng dòng tại thời điểm đặt; bỏ qua giá client gửi. | Must |
-| FR-32 | Tạo đơn, tạo dòng đơn và trừ tồn kho diễn ra trong cùng transaction; thiếu hàng thì rollback toàn bộ. | Must |
-| FR-33 | Khách có thể thanh toán đơn của mình đang `PENDING_PAYMENT` bằng Ví hoặc Thẻ mô phỏng; số tiền lấy từ đơn trong database. | Must |
-| FR-34 | Yêu cầu thanh toán lặp lại với cùng `Idempotency-Key` không phát sinh tính tiền lần hai và trả lại kết quả đã lưu; mỗi đơn tối đa một thanh toán thành công. | Must |
-| FR-35 | Khi gateway thành công, đơn chuyển `PAID`; khi thất bại, đơn chuyển `PAYMENT_FAILED` và tồn kho được hoàn đúng một lần. | Must |
-| FR-36 | Khi gateway timeout, payment và đơn giữ trạng thái chờ; hệ thống đối soát theo key để xác định kết quả cuối. | Should |
-| FR-37 | Hệ thống hủy đơn `PENDING_PAYMENT` quá hạn và hoàn tồn kho, nhưng không hủy payment đang chờ/thành công trước khi đối soát. | Should |
-| FR-38 | Giao diện hiển thị xác nhận hoặc lỗi đặt/thanh toán rõ ràng, trạng thái đang xử lý và ngăn gửi lặp do bấm nhiều lần. | Must |
-| FR-39 | Khách có thể áp dụng khuyến mãi và điểm tích lũy; server tính lại tổng tiền. | Could |
+| FR-25 | Khách đã đăng nhập có thể tạo đơn từ giỏ hàng hợp lệ; chủ đơn lấy từ JWT và đơn mới ở trạng thái `PENDING_PAYMENT`. | Must |
+| FR-26 | Server tính tổng tiền và lưu snapshot tên, giá, size, topping của từng dòng tại thời điểm đặt; bỏ qua giá client gửi. | Must |
+| FR-27 | Tạo đơn, tạo dòng đơn và trừ tồn kho diễn ra trong cùng transaction; thiếu hàng thì rollback toàn bộ. | Must |
+| FR-28 | Khách có thể thanh toán đơn của mình đang `PENDING_PAYMENT` bằng Ví hoặc Thẻ mô phỏng; số tiền lấy từ đơn trong database. | Must |
+| FR-29 | Yêu cầu thanh toán lặp lại với cùng `Idempotency-Key` không phát sinh tính tiền lần hai và trả lại kết quả đã lưu; mỗi đơn tối đa một thanh toán thành công. | Must |
+| FR-30 | Khi gateway thành công, đơn chuyển `PAID`; khi thất bại, đơn chuyển `PAYMENT_FAILED` và tồn kho được hoàn đúng một lần. | Must |
+| FR-31 | Khi gateway timeout, payment và đơn giữ trạng thái chờ; hệ thống đối soát theo key để xác định kết quả cuối. | Should |
+| FR-32 | Hệ thống hủy đơn `PENDING_PAYMENT` quá hạn và hoàn tồn kho, nhưng không hủy payment đang chờ/thành công trước khi đối soát. | Should |
+| FR-33 | Giao diện hiển thị xác nhận hoặc lỗi đặt/thanh toán rõ ràng, trạng thái đang xử lý và ngăn gửi lặp do bấm nhiều lần. | Must |
+| FR-34 | Khách có thể áp dụng khuyến mãi và điểm tích lũy; server tính lại tổng tiền. | Could |
 
-### 3.5 Lịch sử và trạng thái đơn (`FR-40`–`FR-49`)
+### 3.5 Lịch sử và trạng thái đơn (`FR-35`–`FR-39`)
 
 | Mã | Yêu cầu | Ưu tiên |
 |---|---|---|
-| FR-40 | Khách có thể xem danh sách lịch sử đơn của chính mình. | Must |
-| FR-41 | Khách có thể xem chi tiết và trạng thái hiện tại của một đơn thuộc quyền sở hữu của mình. | Must |
-| FR-42 | Nhân viên có thể xem các đơn cần xử lý tại cửa hàng. | Must |
-| FR-43 | Nhân viên có thể cập nhật trạng thái đơn theo luồng hợp lệ sau thanh toán (`PAID` → `PREPARING` → `READY` → `COMPLETED`). | Must |
-| FR-44 | Hệ thống từ chối cập nhật trạng thái không hợp lệ hoặc do người dùng không đủ quyền. | Must |
+| FR-35 | Khách có thể xem danh sách lịch sử đơn của chính mình. | Must |
+| FR-36 | Khách có thể xem chi tiết và trạng thái hiện tại của một đơn thuộc quyền sở hữu của mình. | Must |
+| FR-37 | Nhân viên có thể xem các đơn cần xử lý tại cửa hàng. | Must |
+| FR-38 | Nhân viên có thể cập nhật trạng thái đơn theo luồng hợp lệ sau thanh toán (`PAID` → `PREPARING` → `READY` → `COMPLETED`). | Must |
+| FR-39 | Hệ thống từ chối cập nhật trạng thái không hợp lệ hoặc do người dùng không đủ quyền. | Must |
 
-Payment có trạng thái riêng `PENDING`, `SUCCESS`, `FAILED`; `PENDING` không được hiển thị thành công. Staff không tự sửa trạng thái thanh toán hoặc cập nhật đơn đang `PENDING_PAYMENT`. FR-45…FR-49 để trống.
+Payment có trạng thái riêng `PENDING`, `SUCCESS`, `FAILED`; `PENDING` không được hiển thị thành công. Staff không tự sửa trạng thái thanh toán hoặc cập nhật đơn đang `PENDING_PAYMENT`.
 Tiêu chí trọng yếu: lịch sử mặc định 20 đơn/trang, chỉ gồm đơn của khách đang đăng nhập; chi tiết dùng snapshot và trả 401/403/404 phù hợp; polling mỗi 5 giây khi trang hiển thị, dừng ở trạng thái cuối/ra trang và không gửi chồng; cập nhật trạng thái cạnh tranh trên dữ liệu cũ trả 409, UI tải lại thay vì tự gửi tiếp. Tiêu chí chi tiết nằm tại [`srs-order-history-status.md`](./srs-order-history-status.md).
 
 ## 4. Yêu cầu phi chức năng
@@ -152,54 +150,6 @@ Tiêu chí trọng yếu: lịch sử mặc định 20 đơn/trang, chỉ gồm 
 
 **Tính khả dụng:** NFR-10 nói về usability của giao diện; NFR-16 là readiness health check. Các tài liệu nguồn không đặt tỷ lệ uptime/SLA, nên SRS này không tự cam kết uptime.
 
-### 4.1 Ánh xạ mã NFR từ tài liệu thành phần
-
-| Mã nguồn | Mã chuẩn / xử lý |
-|---|---|
-| `FR-CRT-01` | FR-10 |
-| `FR-CRT-02` | FR-11 |
-| `FR-CRT-03` | FR-12 |
-| `FR-CRT-04` | FR-13 |
-| `FR-CRT-05` | FR-14 phần lưu client-side; yêu cầu lưu database/đồng bộ nhiều thiết bị không thuộc MVP theo quyết định kiến trúc |
-| `FR-CRT-06` | FR-15 (nhập mã ở UI) và FR-39 (server áp dụng/tính lại tổng) |
-| `FR-UI-01` | FR-16 |
-| `FR-UI-02` | FR-17 |
-| `FR-UI-03`, `FR-UI-04` | FR-18 |
-| `FR-UI-05` | FR-19 |
-
-FR-40…FR-44 đã dùng mã chuẩn trong tài liệu lịch sử/trạng thái; giữ nguyên.
-### 4.2 Ánh xạ mã NFR từ tài liệu thành phần
-
-| Mã cũ trong tài liệu thành phần | Mã chuẩn |
-|---|---|
-| Menu `NFR-01` (hiệu năng) | NFR-01 |
-| Menu `NFR-02` (toàn vẹn) | NFR-06 |
-| Menu `NFR-03` (API) | NFR-12 |
-| Menu `NFR-04` (kiểm thử) | NFR-13 |
-| `NFR-CRT-01` (hiệu năng giỏ) / `NFR-UI-01` (hiệu năng UI) | NFR-04 |
-| `NFR-CRT-02` (toàn vẹn giỏ) | NFR-06 |
-| `NFR-CRT-03` (bảo mật giỏ server-side) | Không áp dụng cho cart client-only; bảo vệ thao tác tạo đơn theo NFR-07 |
-| `NFR-UI-02` (usability) / `NFR-HIS-03` (mobile usability) | NFR-10 |
-| `NFR-UI-03` (browser compatibility) | NFR-11 |
-| `NFR-HIS-01` (hiệu năng API) | NFR-03 |
-| `NFR-HIS-02` (độ trễ trạng thái) | NFR-05 |
-| `NFR-HIS-04` (phản hồi UI) | NFR-09 |
-| `NFR-ORD-01` (toàn vẹn) | NFR-06 |
-| `NFR-ORD-02` (bảo mật) | NFR-07 |
-| `NFR-ORD-03` (phục hồi) | NFR-08 |
-| `NFR-ORD-04` (hiệu năng tạo đơn) | NFR-02 |
-| `NFR-ORD-05` (UI) | NFR-09 |
-| `NFR-ORD-06` (API) | NFR-12 |
-| `NFR-ORD-07` (kiểm thử) | NFR-13 |
-| `NFR-DEP-01` (CI) | NFR-14 |
-| `NFR-DEP-02` (local) | NFR-15 |
-| `NFR-DEP-03` (health) | NFR-16 |
-| `NFR-DEP-04` (logging) | NFR-07 |
-| `NFR-DEP-05` (secrets) | NFR-17 |
-| `NFR-DEP-06` (deploy/rollback) | NFR-18 |
-| `NFR-DEP-07` (production) | NFR-19 |
-| `NFR-DEP-08` (bàn giao) | NFR-20 |
-
 **Chỉ tiêu/kiểm tra UI được hợp nhất từ SRS giỏ hàng và giao diện**
 
 - Giỏ hàng: chọn đủ thuộc tính mới cho thêm món; các lựa chọn giống nhau được gộp; công thức tổng tạm tính là tổng `(đơn giá + phụ thu topping) × số lượng`; giảm về 0 và xóa toàn bộ cần xác nhận; chặn số lượng âm/vượt tồn.
@@ -219,12 +169,12 @@ Nguồn sơ đồ: [`use-case-overview.puml`](../diagrams/use-case-overview.puml
 
 | Use-case | Actor chính | Yêu cầu liên quan |
 |---|---|---|
-| UC-01 Đặt và thanh toán đơn | Khách hàng, Payment Service mô phỏng | FR-06, FR-07, FR-30…FR-39 |
+| UC-01 Đặt và thanh toán đơn | Khách hàng, Payment Service mô phỏng | FR-06, FR-07, FR-25…FR-34 |
 | UC-02 Xem menu và chi tiết sản phẩm | Khách hàng | FR-01…FR-05 |
 | UC-03 Quản lý giỏ hàng | Khách hàng | FR-10…FR-15 |
 | UC-04 Đăng ký/đăng nhập | Khách hàng, Nhân viên | FR-20…FR-24 |
-| UC-05 Xem lịch sử/theo dõi đơn | Khách hàng | FR-40, FR-41 |
-| UC-06 Xử lý đơn tại quầy | Nhân viên | FR-42…FR-44 |
+| UC-05 Xem lịch sử/theo dõi đơn | Khách hàng | FR-35, FR-36 |
+| UC-06 Xử lý đơn tại quầy | Nhân viên | FR-37…FR-37 |
 
 Đặc tả luồng checkout chi tiết tại [`use-case-checkout.md`](./use-case-checkout.md); sơ đồ trình tự tại [`sequence-checkout.puml`](../diagrams/sequence-checkout.puml).
 
