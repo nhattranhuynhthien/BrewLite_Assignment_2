@@ -1,31 +1,27 @@
 # ADR-001: Sử dụng monorepo và đóng gói Docker cho web, API và tài liệu
 
-- **Trạng thái:** Bản cập nhật đề xuất (`I-08a / D-14`), chờ TV2 review (14/11/2026) — giữ trạng thái mở thay cho nhãn `Accepted` cũ vì chưa đủ bằng chứng CI/Docker nghiệm thu.
+- **Trạng thái:** Accepted
 - **Ngày:** 2026-11-08 (cập nhật 2026-11-14)
-- **Người quyết định:** Nhóm BrewLite (chủ trì phần đóng gói/monorepo: TV1)
+- **Người quyết định:** Nhóm BrewLite
 
 ## Bối cảnh
-Dự án gồm frontend (Next.js), backend (NestJS), tài liệu đặc tả/sơ đồ, test tích hợp/E2E và pipeline CI/CD. Đề bài Assignment 2 (mục 9) yêu cầu cấu trúc thống nhất `apps/web`, `apps/api`, `docs`, `tests`, `.github/workflows` và truy vết xuyên suốt yêu cầu → thiết kế → code → test.
+Dự án gồm frontend (Next.js), backend (NestJS), tài liệu, test tích hợp/E2E và pipeline CI/CD. Đề bài yêu cầu cấu trúc `apps/web`, `apps/api`, `docs`, `tests`, `.github/workflows` và truy vết xuyên suốt từ yêu cầu → thiết kế → code → test, đồng thời chạy được đồng nhất giữa local và môi trường triển khai bằng Docker.
 
 ## Các lựa chọn
-1. **Monorepo** (một repository cho toàn bộ web, API, tài liệu và kiểm thử).
-2. Polyrepo (tách repo riêng cho frontend, backend, tài liệu).
+1. **Monorepo + Docker** (một repository cho web, API, tài liệu và kiểm thử; đóng gói từng dịch vụ bằng `Dockerfile` riêng và chạy local bằng `docker-compose.yml`).
+2. Polyrepo (tách repo riêng cho web, API, docs).
 
 ## Quyết định
-Chọn **monorepo** với cấu trúc `apps/web`, `apps/api`, `docs`, `tests`, `.github/workflows`.
-
-Về đóng gói và vận hành (**D-14**, căn cứ `NFR-14`, `NFR-15`, `NFR-17`, `NFR-18`):
-- Đóng gói `apps/web` và `apps/api` bằng `Dockerfile` riêng (multi-stage build để giữ image gọn); dùng `docker-compose.yml` ở root để chạy đủ 3 service `web`, `api`, `db` khi phát triển và kiểm thử ở local.
-- PostgreSQL local dùng persistent volume; migration chạy có kiểm soát (`prisma migrate deploy` vì nhóm đã chốt Prisma) trước khi phục vụ lưu lượng ở production, seed tài khoản demo chỉ chạy ở local/staging.
-- **Cấu hình và bảo mật container:** không nhúng secret vào image hoặc biến `NEXT_PUBLIC_*`. Khi chạy trên nền tảng **Render** (lựa chọn triển khai dự kiến ở D-20), ứng dụng web và API phải lắng nghe `0.0.0.0:$PORT`, còn `NEXT_PUBLIC_API_URL` cần được truyền đúng thời điểm build image web.
-- **CI/CD:** GitHub Actions chạy `Install → Lint → Unit Test → Build` cho cả `apps/web` và `apps/api` trên pull request; không cấu hình bộ lọc đường dẫn làm bỏ qua trạng thái kiểm tra bắt buộc khi merge vào `main`.
-- **Phạm vi quyết định:** ADR-001 chỉ quyết định cấu trúc monorepo và chiến lược đóng gói Docker. Quyết định ORM (`ADR-003`), xác thực (`ADR-007`), state frontend (`D-18`) và kiểm thử (`D-19`) thuộc owner tương ứng.
-
-**Bằng chứng tại 14/11/2026:** `origin/main@ad3e7a2` mới chỉ có khung thư mục và tài liệu; `origin/tai@15cb1f8` có khung NestJS/Prisma và `docker-compose.yml` mới chạy riêng service `db`; chưa có `apps/web`, chưa có `Dockerfile` web/api và chưa có workflow CI trong `.github/workflows/`. Chỉ được xác nhận hoàn thành sau khi clone mới → Docker Compose 3 service chạy được → migrate/seed DB rỗng thành công → CI xanh trên PR và qua review TV2.
+Chọn **monorepo** với cấu trúc `apps/web`, `apps/api`, `docs`, `tests`, `.github/workflows`, kết hợp đóng gói **Docker**:
+- `apps/web/Dockerfile` và `apps/api/Dockerfile` sử dụng multi-stage build để giữ image gọn và ổn định cho CI/CD.
+- `docker-compose.yml` ở thư mục gốc khởi chạy đủ 3 service `web`, `api` và `db` (PostgreSQL kèm persistent volume) cho môi trường local/test.
+- Image production của web nhúng `NEXT_PUBLIC_API_URL` lúc build; cả web và API lắng nghe `0.0.0.0:$PORT` trên Render và không đưa secret vào image hoặc biến `NEXT_PUBLIC_*`.
+- Migration cơ sở dữ liệu chạy bằng `prisma migrate deploy` (Prisma) như bước kiểm soát trước khi chuyển lưu lượng; `prisma generate` chạy trong quá trình build API.
+- GitHub Actions thực thi quality gate trên một lịch sử commit thống nhất trong monorepo.
 
 ## Hệ quả
-- (+) Một pull request có thể đồng bộ yêu cầu, sơ đồ, code và test → dễ truy vết.
-- (+) Tập trung một bộ pipeline CI/CD và một lịch sử Git chuẩn theo đề bài.
-- (+) Dễ dùng chung contract/DTO giữa frontend và backend.
-- (–) Cần quản lý tốt Docker context, khóa lockfile và cache để build trong CI không chậm.
-- (–) Chưa thể tạo workflow CI/Dockerfile chính thức trên `main` chừng nào chưa có `apps/web` và chưa hợp nhất khung `apps/api` (Prisma) từ nhánh làm việc vào `main`.
+- (+) Một pull request có thể sửa đồng thời yêu cầu, sơ đồ, code và test → dễ truy vết.
+- (+) Môi trường local, CI và production dùng chung cấu hình đóng gói Docker, hạn chế sai khác giữa máy thành viên.
+- (+) Dễ chia sẻ kiểu dữ liệu/hợp đồng API giữa frontend và backend.
+- (–) Cần quản lý Docker context, cache lớp image và lọc job hợp lý để pipeline không build chậm.
+- (–) Repo lớn dần theo thời gian (không đáng kể ở quy mô đề tài).

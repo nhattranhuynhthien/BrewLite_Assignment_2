@@ -1,12 +1,8 @@
 # Kiến trúc hệ thống BrewLite (Task 3.1)
 
-- **Phiên bản:** 1.3 – cập nhật đồng bộ `origin/main@ad3e7a2` ngày 14/11/2026, chờ TV2 review
-- **Phương pháp trình bày:** C4 model (Level 1–2) kết hợp kiến trúc phân lớp cho backend. Các quyết định quan trọng được ghi tại `docs/architecture/adr/`.
-- **Tài liệu liên quan:** [SRS tổng quát](requirements/srs.md) *(nguồn chuẩn mã FR/NFR đã hợp nhất)*, [Use-case checkout](requirements/use-case-checkout.md), [Điều kiện triển khai (D-20)](architecture/deployment-readiness.md), [Sơ đồ triển khai Render](diagrams/deployment-render.svg) ([nguồn PUML](diagrams/deployment-render.puml)).
-
-> **Lưu ý hiện trạng:** Đây là thiết kế đề xuất, không phải xác nhận hệ thống đã triển khai. Đối chiếu ngày `14/11/2026` trên `origin/main@ad3e7a2` (sau PR #54), `origin/Huy@bdf5891`, `origin/Nghia1@9f6cb4f` (PR #53) và `origin/tai@15cb1f8`: nhánh `main` chưa có ứng dụng thực thi (`apps/api`, `apps/web`, `.github/workflows` mới chỉ có `.gitkeep`); mã API/Prisma/Compose DB hiện nằm riêng trên `origin/tai`; chưa có code Next.js web, Dockerfile, CI/CD workflow hay URL production. PR #53 (chưa merge) đang xung đột với PR #54 vừa merge về bộ mã FR và các file SRS thành phần.
-
-Tài liệu này là đầu mối duy nhất cho mô tả kiến trúc **D-13**. [Đường dẫn kiến trúc cũ](architecture/architecture.md) trỏ về đây để tránh duy trì hai luồng mô tả payment khác nhau. Nhóm đã chốt dùng **Prisma** (`ADR-003: 003-postgresql-prisma.md`); việc đánh dấu `Superseded` cho bản đề xuất TypeORM (`003-orm-schema-catalog.md`) và thống nhất đánh số ADR các mảng khác thuộc chủ sở hữu tương ứng hoàn tất.
+- **Phiên bản:** 1.2 (cập nhật 2026-11-14)
+- **Phương pháp trình bày:** C4 model (Level 1–2) kết hợp kiến trúc phân lớp cho backend. Các quyết định quan trọng được ghi tại `docs/architecture/adr/` (ADR-001 đến ADR-008).
+- **Tài liệu liên quan:** [SRS](requirements/srs.md), [Use-case checkout](requirements/use-case-checkout.md), [Deployment diagram](diagrams/deployment-render.svg) ([PUML](diagrams/deployment-render.puml))
 
 ## 1. Mục tiêu và ràng buộc kiến trúc
 
@@ -22,155 +18,161 @@ Tài liệu này là đầu mối duy nhất cho mô tả kiến trúc **D-13**.
 
 ```mermaid
 flowchart LR
-    C[Khách hàng] -->|Đặt và theo dõi đơn| B[BrewLite]
-    S[Nhân viên quầy] -->|Xử lý đơn sau thanh toán| B
-    B -->|Ví hoặc Thẻ mô phỏng| P[Payment Service logic]
+    C[Khách hàng<br/>Mobile / PWA] -->|Xem menu, đặt & thanh toán, theo dõi đơn| B[Hệ thống BrewLite]
+    S[Nhân viên quầy] -->|Cập nhật trạng thái đơn| B
+    B -->|Thanh toán Ví / Thẻ mô phỏng| P[Cổng thanh toán mô phỏng]
 ```
-
-Payment Service là actor logic; cách triển khai đề xuất là adapter bên trong API (`ADR-006`).
 
 | Thành phần | Mô tả |
 |---|---|
 | Khách hàng | Đặt và thanh toán đồ uống, theo dõi đơn trên điện thoại |
-| Nhân viên quầy | Xem đơn và cập nhật trạng thái đơn (`PAID → PREPARING → READY → COMPLETED`) |
-| BrewLite | Hệ thống đặt đồ uống (`apps/web` + `apps/api` + PostgreSQL) |
-| Cổng thanh toán (mô phỏng) | Hệ thống bên ngoài về mặt logic, được cài đặt bằng adapter chạy trong API |
+| Nhân viên quầy | Xem đơn và cập nhật trạng thái đơn |
+| BrewLite | Hệ thống đặt đồ uống (web + API + database) |
+| Cổng thanh toán (mô phỏng) | Hệ thống bên ngoài về mặt logic, được cài đặt bằng adapter chạy trong API (ADR-006) |
 
 ## 3. C4 – Level 2: Container
 
 ```mermaid
 flowchart LR
-    U[Trình duyệt PWA] -->|HTTPS| W[Next.js Web]
-    U -->|HTTPS REST + JWT| A[NestJS API]
-    W -->|REST nếu render phía server| A
-    A -->|PostgreSQL protocol / Private Network| D[(PostgreSQL + persistent storage)]
+    U[Trình duyệt / PWA] -->|HTTPS| W[Web App<br/>Next.js]
+    U -->|HTTPS REST + JWT| A[API<br/>NestJS]
+    W -->|REST SSR nếu cần| A
+    A -->|TCP / Private Network :5432| D[(Database<br/>PostgreSQL)]
 ```
 
-Sơ đồ trên minh họa mức container; cổng, TLS termination, cơ chế migration và hạ tầng Render dự kiến được chi tiết tại [Điều kiện triển khai (D-20)](architecture/deployment-readiness.md) và [Sơ đồ triển khai Render](diagrams/deployment-render.svg).
-
-| Container | Công nghệ | Trách nhiệm | Mã nguồn dự kiến |
+| Container | Công nghệ | Trách nhiệm | Mã nguồn |
 |---|---|---|---|
 | Web App | Next.js, PWA | Giao diện mobile-first, giỏ hàng phía client, gọi API, hiển thị loading/empty/error | `apps/web` |
 | API | NestJS | Nghiệp vụ, xác thực JWT, validate, transaction, idempotency, job nền, gateway thanh toán mô phỏng | `apps/api` |
-| Database | PostgreSQL | Lưu người dùng, menu, đơn hàng, thanh toán, idempotency key | `apps/api/prisma/` (Prisma schema & migrations) |
+| Database | PostgreSQL | Lưu dữ liệu bền vững, ràng buộc toàn vẹn | `docker-compose.yml` (local), `apps/api/prisma/` (schema + migrations) |
 
-## 4. Kiến trúc backend (Modular Monolith)
+Cổng thanh toán mô phỏng **không phải container riêng**: nó là adapter `MockPaymentGateway` trong module `payments` của API (`apps/api/src/payments/gateway`), nên xuất hiện ở mức component (mục 4), không ở mức container (ADR-006).
 
-Backend tổ chức dạng modular monolith trên NestJS, chia theo miền nghiệp vụ tương ứng 4 phân hệ backend của nhóm:
+## 4. Kiến trúc phân lớp của backend (NestJS)
+
+Backend là modular monolith: một ứng dụng triển khai duy nhất, chia module theo domain (ADR-002).
 
 ```text
 apps/api/src/
-  common/       # config validation, logger, guards, decorators, error filters
-  prisma/       # PrismaModule & PrismaService kết nối PostgreSQL dùng chung
-  auth/         # TV2: đăng ký, đăng nhập, JWT, Users
-  products/     # TV3: danh mục, sản phẩm, size, topping, tồn kho
-  orders/       # TV4: tạo đơn (transaction), validate, lịch sử/chi tiết, cập nhật trạng thái
-  payments/     # TV4: thanh toán mô phỏng, idempotency, job nền đối soát/hủy đơn
-  health/       # TV2: GET /health, GET /health/live
+├── auth/          # đăng ký, đăng nhập, JWT, guard, thực thể User
+├── products/      # menu, size, topping, tồn kho
+├── orders/        # tạo đơn, PricingService, trạng thái, lịch sử
+├── payments/      # thanh toán, idempotency, gateway mô phỏng, job nền
+├── promotions/    # mức Could, cắt được
+├── loyalty/       # mức Could, cắt được
+├── health/        # GET /health, GET /health/live
+├── common/        # filter, interceptor, logger, guard dùng chung
+├── config/        # đọc và validate biến môi trường
+└── prisma/        # PrismaModule + PrismaService (dùng chung)
+
+apps/api/prisma/
+├── schema.prisma  # mô hình dữ liệu
+├── migrations/    # lịch sử migration (SQL)
+└── seed.ts        # dữ liệu mẫu
 ```
+
+Giỏ hàng được giữ phía client (Web App), chỉ gửi lên server khi đặt đơn; server không có module `cart`.
 
 Mỗi module theo 3 lớp:
 
-| Lớp | Thành phần | Trách nhiệm |
+| Lớp | Thành phần NestJS | Quy tắc |
 |---|---|---|
-| Presentation | Controller, DTO (`class-validator`), Guards | Nhận HTTP request, validate input, kiểm tra JWT/role, map response/HTTP status |
-| Application / Domain | Service | Quy tắc nghiệp vụ: tính giá server, chuyển trạng thái, transaction, idempotency |
-| Infrastructure | `PrismaService` (PostgreSQL), Payment gateway adapter | Truy cập DB và hệ thống ngoài |
+| Presentation | Controller, DTO (class-validator), Guard | Chỉ nhận/trả HTTP, validate đầu vào, không chứa nghiệp vụ |
+| Application/Domain | Service | Nghiệp vụ, quản lý transaction, gọi sang module khác qua service được export |
+| Infrastructure | PrismaService (Prisma Client), Payment gateway adapter | Truy cập DB và hệ thống ngoài |
 
 **Quy tắc phụ thuộc:**
-- Trong module: `Controller → Service → PrismaService hoặc Adapter`.
-- Giữa các module: chỉ gọi qua service được export, không truy cập bảng của nhau; hướng một chiều `payments → orders → products`, không phụ thuộc vòng. Các method tham gia giao dịch nhận context transaction (`tx`) để nhiều module chạy chung một transaction.
-- Mục tiêu kiểm soát tự động: dùng ESLint rule (`no-restricted-imports`) trong CI. Hiện tại `.github/workflows` chưa có workflow và `origin/tai:apps/api/package.json` chưa có script `lint`, nên chưa có bằng chứng kiểm tra tự động.
-- Job nền (hủy đơn quá hạn, đối soát payment treo) đặt trong module `payments`, chạy trong tiến trình API bằng `@nestjs/schedule`.
+- Trong module: Controller → Service → PrismaService/Adapter.
+- Giữa các module: chỉ gọi qua service được export, không truy cập bảng của nhau; hướng một chiều `payments → orders → products`, không phụ thuộc vòng. Các method tham gia giao dịch nhận `tx` (`Prisma.TransactionClient`) để nhiều module chạy chung một transaction.
+- Quy tắc được kiểm tra tự động trong bước lint của CI (ESLint `no-restricted-imports` hoặc `dependency-cruiser`).
+- Job nền (hủy đơn quá hạn, đối soát payment treo) đặt trong module `payments`, chạy trong container API bằng `@nestjs/schedule`.
 
-**Thiết kế bảo mật (ADR-007; chưa triển khai đầy đủ):** JWT HS256 sống ngắn, `JwtAuthGuard` toàn cục kèm `@Public()` cho endpoint công khai, `RolesGuard` cho `CUSTOMER`/`STAFF`, kiểm tra quyền sở hữu đơn trong service, mật khẩu băm bằng bcrypt.
+**Bảo mật (ADR-007):** JWT HS256 sống ngắn, `JwtAuthGuard` toàn cục kèm `@Public()` cho endpoint công khai, `RolesGuard` cho `CUSTOMER`/`STAFF`, kiểm tra quyền sở hữu đơn trong service, mật khẩu băm bằng bcrypt.
 
 ## 5. Frontend Next.js / PWA
 
-- **Mobile-first:** layout ưu tiên màn hình nhỏ (từ 320 px, kiểm tra lịch sử ở 360/390 px), vùng chạm chính `>= 48x48` CSS px.
-- **PWA:** `manifest.webmanifest`, service worker cache tài nguyên tĩnh và trang menu; **không** cache các API có xác thực (đơn hàng, thanh toán).
-- **Gọi API:** lớp `lib/api` tập trung, tự gắn JWT trong header `Authorization`; tự sinh `Idempotency-Key` cho mỗi ý định thanh toán và giữ nguyên key khi retry cùng ý định; đơn mới dùng key mới.
-- **Phiên đăng nhập:** khi API trả `401`, chuyển hướng đăng nhập và giữ giỏ hàng (lưu phía client).
-- **Trạng thái UI:** mọi màn hình dữ liệu đều tách bạch trạng thái loading / empty / error; trạng thái đơn không chỉ phân biệt bằng màu.
-- **Cấu hình:** biến `NEXT_PUBLIC_API_URL` được nhúng lúc build Docker/Next.js cho từng môi trường (ADR-008); không đặt secret trong bất kỳ biến `NEXT_PUBLIC_*` nào.
+- **Mobile-first:** layout ưu tiên màn hình nhỏ, thành phần chạm lớn.
+- **PWA:** `manifest.webmanifest`, service worker cache tài nguyên tĩnh và trang menu; không cache các API có xác thực (đơn hàng, thanh toán).
+- **Gọi API:** lớp `lib/api` tập trung, tự gắn JWT trong header `Authorization`; tự sinh `Idempotency-Key` cho mỗi ý định thanh toán và giữ nguyên key khi retry; đơn mới thì dùng key mới.
+- **Phiên đăng nhập:** khi API trả `401`, chuyển sang trang đăng nhập và giữ giỏ hàng (lưu phía client).
+- **Trạng thái UI:** mọi màn hình dữ liệu đều có loading / empty / error.
+- **Cấu hình:** `NEXT_PUBLIC_API_URL` được nhúng lúc build, nên image web production được build với URL API của production (ADR-008). Không đặt secret trong biến `NEXT_PUBLIC_*`.
 
 ## 6. PostgreSQL và cơ chế migration
 
-- **Quyết định ORM đã chốt:** Nhóm đã chốt sử dụng **PostgreSQL + Prisma (`Prisma Migrate`)** theo [ADR-003 Prisma](architecture/adr/003-postgresql-prisma.md), khớp với cấu trúc `apps/api/prisma/schema.prisma` trên nhánh `origin/tai@15cb1f8`. Bản đề xuất TypeORM cũ ([003-orm-schema-catalog.md](architecture/adr/003-orm-schema-catalog.md)) trên `main` cần được **TV3** đánh dấu `Superseded` để xóa trùng mã ADR `003` (giữ lại các quy ước schema như tiền `integer` VND, `CHECK`, snapshot giá và seed idempotent).
-- **Local:** `prisma migrate dev` tạo migration mới. **Production/CI:** `prisma migrate deploy` chỉ áp dụng các migration đã commit (không dùng `migrate dev` hay `db push` ở production); Dockerfile/CI chạy `prisma generate` trước bước build.
-- **Migration khi deploy:** chạy như một bước kiểm soát riêng **trước khi chuyển lưu lượng** sang bản mới; thất bại thì pipeline dừng. Vì runner CI công khai không được kết nối trực tiếp vào DB private trên Render, cần dùng tác vụ chạy phía Render trong mạng nội bộ.
-- **Seed:** script seed phải idempotent (`prisma db seed`). Dữ liệu danh mục/món mẫu có thể chạy kiểm soát; tài khoản demo chỉ dành cho local/staging.
-- **Migration an toàn:** ưu tiên thay đổi tương thích ngược (expand → contract); rollback dùng migration sửa ngược hoặc khôi phục snapshot trước migration.
-- **Ràng buộc dữ liệu bắt buộc:** `CHECK (stock_quantity >= 0)`, giá và phụ thu nguyên VND `>= 0`, partial unique index `payments(order_id) WHERE status = 'SUCCESS'`, khóa duy nhất `(user_id, key)` cho idempotency, khóa ngoại rõ ràng.
-- **Storage:** PostgreSQL local dùng persistent volume trong `docker-compose.yml`; production dùng managed persistent storage và **tắt external/public access**.
+- Dùng **Prisma** (Prisma Client + Prisma Migrate). Mô hình dữ liệu khai báo trong `apps/api/prisma/schema.prisma` (ADR-003).
+- **Local:** `prisma migrate dev` tạo migration mới. **Production/CI:** `prisma migrate deploy` chỉ áp dụng các migration đã commit (không dùng `migrate dev` hay `db push` ở production); Dockerfile và CI chạy `prisma generate` trước bước build.
+- `prisma migrate deploy` chạy như **một bước riêng trong pipeline deploy** (trong mạng nội bộ trước khi chuyển lưu lượng sang bản mới); thất bại thì pipeline dừng. Có backup/snapshot trước khi migrate nếu nền tảng hỗ trợ.
+- **Seed** bằng `prisma db seed` (`prisma/seed.ts`), idempotent. Dữ liệu tham chiếu (danh mục, sản phẩm, size, topping) được chạy một lần có kiểm soát trên production để menu không rỗng; dữ liệu demo (tài khoản mẫu) chỉ chạy ở local/staging.
+- **Migration an toàn:** chỉ thêm cột/bảng theo kiểu tương thích ngược (expand → contract). Prisma không sinh `down`, nên rollback dùng migration mới "sửa ngược" hoặc restore backup.
+- **Ràng buộc ở mức DB:** `CHECK (stock_quantity >= 0)`, giá và phụ thu `>= 0`, partial unique index `payments(order_id) WHERE status = 'SUCCESS'` (thêm bằng SQL thủ công trong file migration), `@@unique([userId, key])` cho `idempotency_keys`, khóa ngoại giữa `orders`/`order_items`/`payments`.
+- **Docker:** local chạy service `db` với persistent volume; production dùng managed persistent storage và không public trực tiếp.
 
 ## 7. Dịch vụ thanh toán mô phỏng
 
-- Interface `PaymentGateway` có `charge(request)` (idempotent theo key) và `getStatus(idempotencyKey)` để đối soát sau timeout (`GatewayTimeoutError`).
-- `MockPaymentGateway` (Ví/Thẻ) cho phép mô phỏng thành công, từ chối, timeout và độ trễ; lưu trạng thái giả lập trong DB để không mất khi API khởi động lại.
-- Chọn provider qua `PAYMENT_PROVIDER=mock`, cho phép thay bằng cổng thật mà không sửa nghiệp vụ cốt lõi (ADR-006).
+- Interface `PaymentGateway` có `charge(request)` (idempotent theo key) và `getStatus(idempotencyKey)` để đối soát sau timeout; timeout biểu diễn bằng `GatewayTimeoutError`.
+- `MockPaymentGateway` (Ví/Thẻ) có hành vi điều khiển bằng số thẻ/ví thử nghiệm: thành công, từ chối, timeout đã trừ tiền, timeout chưa trừ tiền, độ trễ. Trạng thái giao dịch lưu trong bảng riêng `mock_gateway_transactions` để không mất khi API khởi động lại.
+- Chọn provider bằng `PAYMENT_PROVIDER=mock`. Có thể thay bằng cổng thật (VNPay/Stripe…) mà không đổi nghiệp vụ nhờ interface.
+- Xem ADR-006.
 
 ## 8. Logging, health check, quản lý cấu hình
 
 | Hạng mục | Giải pháp |
 |---|---|
-| Logging | Log JSON có cấu trúc (pino/`nestjs-pino`), gắn `requestId`, xuất ra stdout; redact `authorization`, `cookie`, mật khẩu, token; không log số thẻ hoặc secret (`NFR-07`) |
-| Health check | `GET /health` (readiness: kiểm tra API + kết nối DB, trả 200 hoặc 503 khi mất DB) theo `NFR-16`; thống nhất với `ADR-008` về `/health/live` trước khi cài đặt `health` module |
-| Cấu hình & cổng | Biến môi trường 12-factor, validate khi khởi động; tương thích biến `PORT` do Render cấp cho Web Service (mã `origin/tai:apps/api/src/main.ts` hiện chỉ đọc `API_PORT`, cần bổ sung `PORT ?? API_PORT ?? 4000` khi tích hợp) |
-| Secret | Lưu ở CI/Render secret manager; repository chỉ chứa `.env.example` (`NFR-17`) |
+| Logging | Log JSON có cấu trúc (pino/nestjs-pino), mỗi request có `requestId`, ghi ra stdout; `redact` cho `authorization`, `cookie`, mật khẩu, token; không log số thẻ |
+| Health check | `GET /health` (readiness: API + kết nối DB, trả 200/503) và `GET /health/live` (liveness, không kiểm tra DB) bằng `@nestjs/terminus`; `/health/live` dùng cho Docker `HEALTHCHECK`, `/health` dùng cho smoke test sau deploy |
+| Cấu hình & cổng | Biến môi trường theo 12-factor; `@nestjs/config` + schema validation, thiếu biến bắt buộc thì app không khởi động; web và API lắng nghe `0.0.0.0:$PORT` trên Render (API fallback `PORT ?? API_PORT ?? 4000`); danh sách biến ở ADR-008 và `.env.example` |
+| Secret | Lưu trong secret của CI/nền tảng triển khai; repo chỉ có `.env.example` |
 
-## 9. Luồng nghiệp vụ đặt và thanh toán (tổng hợp tham chiếu)
+## 9. Luồng nghiệp vụ quan trọng: đặt và thanh toán
 
-1. `POST /orders` (JWT) → kiểm tra JWT/DTO → transaction: kiểm tra & trừ tồn kho có điều kiện, tạo `Order` (`PENDING_PAYMENT`) và `OrderItem` với giá tính phía server + snapshot; hết hàng thì rollback trả `409`.
-2. `POST /payments` (`Idempotency-Key`) → kiểm tra chủ đơn & trạng thái, lưu key `IN_PROGRESS` → gọi gateway mô phỏng:
-   - Thành công → `Payment=SUCCESS`, `Order=PAID`.
-   - Thất bại → `Payment=FAILED`, `Order=PAYMENT_FAILED`, hoàn kho đúng một lần; thử lại bằng đơn mới.
-   - Timeout → giữ trạng thái chờ (`202`), đối soát qua `getStatus` / job nền.
-3. Nhân viên (`STAFF`) xem đơn cần xử lý và chuyển trạng thái hợp lệ `PAID → PREPARING → READY → COMPLETED`.
+1. Client gọi `POST /orders` (JWT) → API validate, mở transaction: trừ tồn kho có điều kiện (`UPDATE ... WHERE stock_quantity >= qty`, theo `product_id` tăng dần), tạo `Order` (`PENDING_PAYMENT`) và `OrderItem`, commit. Hết hàng thì rollback, trả `409 OUT_OF_STOCK`.
+2. Client gọi `POST /payments` với header `Idempotency-Key`. API kiểm tra quyền sở hữu và trạng thái đơn, rồi chèn bản ghi key `IN_PROGRESS` (UNIQUE theo `user_id`, `key`). Key đã tồn tại thì: nội dung khác → `422`, đã `COMPLETED` → trả lại kết quả cũ, đang `IN_PROGRESS` → `409`.
+3. API gọi Payment Gateway (ngoài transaction DB):
+   - **Thành công:** `Payment=SUCCESS`, `Order=PAID`.
+   - **Thất bại:** `Payment=FAILED`, `Order=PAYMENT_FAILED` (trạng thái cuối), hoàn tồn kho trong cùng transaction. Muốn thử lại, khách tạo **đơn mới** từ giỏ hàng.
+   - **Timeout:** payment giữ `PENDING`, đơn giữ `PENDING_PAYMENT`, API trả `202`; hệ thống đối soát bằng `getStatus` rồi xử lý như hai nhánh trên.
+4. Cập nhật đơn và hoàn kho dùng cập nhật có điều kiện (`WHERE status = 'PENDING_PAYMENT'`, hoàn kho chỉ khi cập nhật ảnh hưởng đúng 1 dòng) để không hoàn kho hai lần. Job nền hủy đơn `PENDING_PAYMENT` quá hạn theo cùng quy tắc, chỉ hủy đơn không có payment `PENDING`/`SUCCESS` hoặc sau khi đối soát.
+5. Client theo dõi trạng thái qua `GET /orders/:id`.
 
-*(Chi tiết hợp đồng nghiệp vụ thuộc TV4/TV2/TV3 tại ADR-004, ADR-005, [use-case-checkout.md](requirements/use-case-checkout.md) và [srs.md](requirements/srs.md)).*
+Chi tiết: ADR-004, ADR-005 và sequence diagram [sequence-checkout.puml](diagrams/sequence-checkout.puml).
 
-## 10. Lý do chọn kiến trúc và Trade-off
+## 10. Lý do chọn kiến trúc, ưu điểm, hạn chế, trade-off
 
-**Lựa chọn:** Monorepo + Modular Monolith (NestJS) + Next.js tách riêng + PostgreSQL.
+**Lựa chọn:** Monorepo + modular monolith (NestJS) + Next.js tách riêng + PostgreSQL.
 
 | Ưu điểm | Hạn chế | Trade-off |
 |---|---|---|
-| Triển khai/gỡ lỗi đơn giản, phù hợp nhóm 6 người trong 2 Sprint | Không scale độc lập từng module API | Chấp nhận cho tải một cửa hàng; giữ ranh giới module rõ để tách sau nếu cần |
-| Transaction ACID trong một DB bảo đảm nhất quán đơn – kho – thanh toán | Một DB là điểm lỗi đơn (SPOF) | Đánh đổi lấy tính toàn vẹn tài chính/kho; bù bằng persistent storage và backup |
-| Monorepo tập trung code, docs, sơ đồ và traceability | CI phải lọc hoặc tách job hợp lý để tránh build thừa | Vẫn phải chạy đủ quality gate bắt buộc cho web/API khi merge vào `main` |
-| Tách Web/API giúp tận dụng SSR/PWA độc lập với API | Cần cấu hình CORS, 2 URL HTTPS và build-time env cho web | Truyền cấu hình theo môi trường qua biến môi trường/build arg |
+| Đơn giản triển khai và gỡ lỗi; phù hợp quy mô nhóm và thời gian | Không scale từng module độc lập | Chấp nhận vì tải thấp; ranh giới module rõ nên có thể tách thành service sau này |
+| Transaction ACID trong một DB đảm bảo nhất quán đơn hàng/tồn kho/thanh toán | Một DB là điểm lỗi duy nhất | Đánh đổi lấy tính đúng đắn; bổ sung backup/persistent volume |
+| Monorepo giúp CI/CD, tài liệu và truy vết tập trung | Pipeline phải lọc theo thư mục để tránh build thừa | Lọc theo đường dẫn ở mức job trong một workflow để kiểm tra bắt buộc không bị treo (ADR-001) |
+| Tách web/API cho phép deploy và scale độc lập, tận dụng SSR/PWA | Cần cấu hình CORS, quản lý 2 URL; image web phải build theo môi trường | Dùng biến môi trường, build arg trong pipeline và HTTPS |
+| Cổng thanh toán qua interface dễ thay thế | Mô phỏng chưa phản ánh đầy đủ webhook/3-D Secure | Mô phỏng thêm timeout/lỗi và `getStatus` để kiểm thử idempotency và đối soát |
+| Kiến trúc phân lớp dễ viết unit test | Nhiều lớp hơn cho tính năng nhỏ; truyền `tx` làm chữ ký method dài hơn | Giữ lớp mỏng, tránh trừu tượng thừa |
+| Cập nhật có điều kiện và idempotency bảo vệ tính đúng đắn khi đồng thời | Job đối soát làm hệ thống phức tạp hơn | Giới hạn ở đối soát từng giao dịch, không làm đối soát hàng loạt |
 
-## 11. ADR hiện có và các sai khác cần nhóm chốt
+## 11. Danh sách ADR
 
-| Mã file trên `main` | Quyết định | Sai khác / Hành động cần chốt |
-|---|---|---|
-| `001-monorepo.md` | Monorepo + Docker (TV1 – D-14) | Chờ TV2 review bản cập nhật mới |
-| `002-modular-monolith-nestjs.md` | Backend NestJS modular monolith | Đang trùng dải số với D-15 (phân công ghi `ADR 002: JWT và bảo mật`) |
-| `003-postgresql-prisma.md` vs `003-orm-schema-catalog.md` | Prisma (Accepted) vs TypeORM (Proposed) | **Nhóm đã chốt Prisma**; TV3 cần đánh dấu `003-orm-schema-catalog.md` là `Superseded` để hết trùng số `003` |
-| `004-transaction-order-inventory.md` | Transaction đơn hàng & tồn kho | Đủ nội dung nền; chờ khớp enum/sequence |
-| `005-idempotency-payment.md` | Idempotency thanh toán | Đang trùng số với D-18 (phân công ghi `ADR 005: Next.js PWA`) |
-| `006-mock-payment-gateway.md` | Mock Payment Gateway | Đang trùng số với D-19 (phân công ghi `ADR 006: Chiến lược kiểm thử`) |
-| `007-jwt-authentication.md` | JWT Authentication | Nội dung khớp mảng TV2 nhưng khác mã số trong Excel D-15 |
-| `008-logging-health-config.md` | Logging, health check, cấu hình | Cần đồng nhất endpoint `/health` và `/health/live` với TV2 |
+| Mã | Quyết định |
+|---|---|
+| 001 | Dùng monorepo và đóng gói Docker (`001-monorepo.md`) |
+| 002 | Backend NestJS dạng modular monolith |
+| 003 | PostgreSQL + Prisma (`003-postgresql-prisma.md`) |
+| 004 | Transaction khi tạo đơn và trừ tồn kho |
+| 005 | Idempotency cho thanh toán |
+| 006 | Dịch vụ thanh toán mô phỏng qua interface |
+| 007 | Xác thực bằng JWT |
+| 008 | Logging, health check, cấu hình |
 
-## 12. Truy vết Sơ đồ triển khai (`D-20`) → Kiến trúc → Mã nguồn
+## 12. Truy vết deployment diagram → kiến trúc → mã nguồn
 
-| Thành phần trong deployment diagram | Mục liên quan | Mã nguồn mục tiêu | Nền tảng dự kiến & Hiện trạng `14/11/2026` |
+Mỗi container/dịch vụ trong [deployment-render.svg](diagrams/deployment-render.svg) ([PUML](diagrams/deployment-render.puml)) truy vết về một thành phần trong tài liệu này và mã nguồn trên nền tảng **Render**.
+
+| Thành phần trong deployment diagram | Mục trong tài liệu này | Mã nguồn | Nền tảng thực tế |
 |---|---|---|---|
-| Thiết bị người dùng (PWA) | Mục 2, 5 | `apps/web` | Trình duyệt / PWA; `apps/web` trên `main` mới chỉ có `.gitkeep` |
-| Web App (Next.js) | Mục 3, 5 | `apps/web`, `apps/web/Dockerfile` | Render Web Service; chưa có app/Dockerfile/URL |
-| API (NestJS) | Mục 3, 4, 7, 8 | `apps/api`, `apps/api/Dockerfile` | Render Web Service; code API nằm ở `origin/tai@15cb1f8`, chưa vào `main` |
-| PostgreSQL + persistent storage | Mục 3, 6 | `apps/api/prisma/`, `docker-compose.yml` | Render Postgres (private network); trên `tai` mới chỉ compose DB local |
-| Container Registry | Mục 6, D-20 | `.github/workflows` | Chưa chốt nhà cung cấp registry (chỉ dùng nếu Render pull prebuilt image) |
-| Pipeline CI/CD | ADR-001, D-07 | `.github/workflows` | GitHub Actions; hiện có `0` workflow trên `main` |
-
-## 13. Đối chiếu liên kết với bài làm của nhóm (`14/11/2026`)
-
-| Đầu vào đã đọc | Điểm phù hợp | Chỗ lệch & Ảnh hưởng | Đề xuất cho chủ sở hữu |
-|---|---|---|---|
-| `origin/main:docs/requirements/srs.md@ad3e7a2` (PR #54) & PR #53 | Đã chốt `NFR-14..20` cho triển khai và `NFR-07` cho logging | Mục 1 `srs.md` còn ghi `NFR-01…NFR-14`, mục 5 ghi nhầm `FR-37…FR-37`, mục 4 giữ link tới 2 file SRS đã xóa; xung đột trực tiếp với PR #53 | TV2 & TV3 hợp nhất/chốt 1 dải mã FR duy nhất và sửa link gãy |
-| `origin/Huy@bdf5891` (`activity-diagram.puml/.png/.svg`) | Đã có swimlane, kiểm tra tồn kho và nhánh đăng nhập | Chưa mở PR; nhánh dính gitlink rác `BrewLite_Assignment_2`, sửa file SRS đã bị xóa, Activity lặp vô tận khi thanh toán thất bại và thiếu bước giỏ hàng | TV5 dọn nhánh, chỉnh Activity theo SRS và mở PR để TV6 review |
-| `origin/main:docs/diagrams/sequence-checkout.puml/.svg` | Đủ 5 lifeline, JWT, transaction, idempotency | `.puml` lệch `.svg`; nhánh hết hàng không dừng mà vẫn chảy xuống HTTP `201` và thanh toán | TV4 sửa `.puml` và xuất lại `.svg`/`.png` gửi TV1 review |
-| `origin/main:docs/diagrams/class-domain.puml` | Đủ thực thể `User`, `Product`, `Order`, `Payment`, snapshot | Thiếu `PAYMENT_FAILED` trong `OrderStatus`, dùng `SUCCEEDED` thay cho `SUCCESS` ở `PaymentStatus` | TV3 đồng bộ enum khớp với SRS và schema trên `origin/tai` |
-| `origin/tai@15cb1f8` (`apps/api`, `docker-compose.yml`) | Có Prisma schema (`PAYMENT_FAILED`, `SUCCESS`), transaction và 7 e2e specs | Chưa vào `main`; thiếu script `lint`, thiếu `/health`, `main.ts` chỉ đọc `API_PORT` (chưa fallback `PORT` của Render), chưa có `apps/web` | Tách/hợp nhất khung API Prisma lên từ `main` và bổ sung `lint`/`/health`/`PORT`; sau đó TV1 tích hợp Dockerfile (`prisma generate`), Compose 3 service và CI |
+| Thiết bị người dùng (trình duyệt/PWA) | Mục 2, 5 | `apps/web` | Trình duyệt / Mobile PWA |
+| Web App (Next.js) | Mục 3, 5 | `apps/web`, `apps/web/Dockerfile` | Render Web Service (Docker, `$PORT`) |
+| API (NestJS) | Mục 3, 4, 7, 8 | `apps/api`, `apps/api/Dockerfile` | Render Web Service (Docker, `$PORT`) |
+| PostgreSQL + persistent storage | Mục 3, 6 | `apps/api/prisma/`, `docker-compose.yml` | Render PostgreSQL (Private Network, Persistent Storage) |
+| Container registry | Mục 8 (pipeline) | `.github/workflows` | GitHub Container Registry (GHCR) |
+| Pipeline CI/CD | ADR-001, ADR-008 | `.github/workflows` | GitHub Actions |
