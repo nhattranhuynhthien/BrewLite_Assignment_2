@@ -19,12 +19,16 @@ start
 :Kiểm tra trạng thái đăng nhập và JWT hợp lệ (FR-22);
 
 if (Đã đăng nhập và JWT hợp lệ?) then (Chưa / Không hợp lệ)
-    |Khách hàng|
+    |Hệ thống|
     :Hiển thị giao diện đăng nhập;
-    :Nhập thông tin tài khoản, mật khẩu;
+    |Khách hàng|
+    repeat :Nhập thông tin tài khoản, mật khẩu;
+        |Hệ thống|
+        :Xác thực tài khoản và kiểm tra mật khẩu (FR-21);
+    repeat while (Thông tin đúng?) is (Sai / Không hợp lệ)
     
     |Hệ thống|
-    :Xác thực tài khoản, cấp mã JWT và giữ nguyên giỏ hàng (FR-14, FR-21);
+    :Cấp mã JWT và giữ nguyên giỏ hàng (FR-14, FR-21);
 else (Đã đăng nhập)
 endif
 
@@ -57,7 +61,7 @@ else (Đủ hàng)
         stop
         
     elseif (Thất bại - FAILED) then (Từ chối / Lỗi)
-|Hệ thống|
+        |Hệ thống|
         :Cập nhật trạng thái đơn thành PAYMENT_FAILED (FR-30);
         :Hoàn lại tồn kho đã trừ đúng một lần (FR-30);
         :Thông báo thanh toán thất bại (FR-33);
@@ -65,7 +69,7 @@ else (Đủ hàng)
         stop
         
     else (Timeout / Chưa rõ kết quả)
-|Hệ thống|
+        |Hệ thống|
         :Payment giữ PENDING, đơn giữ PENDING_PAYMENT (FR-31);
         :Tiến hành đối soát trạng thái theo Idempotency-Key cũ (FR-31);
         stop
