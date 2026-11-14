@@ -1,8 +1,8 @@
 # Kiến trúc hệ thống BrewLite (Task 3.1)
 
-- **Phiên bản:** 1.2 (cập nhật 2026-11-14)
-- **Phương pháp trình bày:** C4 model (Level 1–2) kết hợp kiến trúc phân lớp cho backend. Các quyết định quan trọng được ghi tại `docs/architecture/adr/` (ADR-001 đến ADR-008).
-- **Tài liệu liên quan:** [SRS](../requirements/srs.md), [Use-case checkout](../requirements/use-case-checkout.md), [Deployment diagram](../diagrams/deployment-render.svg) ([PUML](../diagrams/deployment-render.puml))
+- **Phiên bản:** 1.3 (cập nhật 2026-11-15)
+- **Phương pháp trình bày:** C4 model (Level 1–2) kết hợp kiến trúc phân lớp cho backend. Các quyết định quan trọng được ghi tại `docs/architecture/adr/` (ADR-001 đến ADR-006).
+- **Tài liệu liên quan:** [SRS](../requirements/srs.md), [Use-case checkout](../requirements/use-case-checkout.md), [Deployment diagram](../diagrams/deployment-render.svg) ([PUML](../diagrams/deployment-render.puml)), [Ma trận truy vết](../traceability-matrix.md)
 
 ## 1. Mục tiêu và ràng buộc kiến trúc
 
@@ -28,7 +28,7 @@ flowchart LR
 | Khách hàng | Đặt và thanh toán đồ uống, theo dõi đơn trên điện thoại |
 | Nhân viên quầy | Xem đơn và cập nhật trạng thái đơn |
 | BrewLite | Hệ thống đặt đồ uống (web + API + database) |
-| Cổng thanh toán (mô phỏng) | Hệ thống bên ngoài về mặt logic, được cài đặt bằng adapter chạy trong API (ADR-006) |
+| Cổng thanh toán (mô phỏng) | Hệ thống bên ngoài về mặt logic, được cài đặt bằng adapter chạy trong API (Mục 7, [ADR-004](adr/004-order-payment-consistency.md)) |
 
 ## 3. C4 – Level 2: Container
 
@@ -46,11 +46,11 @@ flowchart LR
 | API | NestJS | Nghiệp vụ, xác thực JWT, validate, transaction, idempotency, job nền, gateway thanh toán mô phỏng | `apps/api` |
 | Database | PostgreSQL | Lưu dữ liệu bền vững, ràng buộc toàn vẹn | `docker-compose.yml` (local), `apps/api/prisma/` (schema + migrations) |
 
-Cổng thanh toán mô phỏng **không phải container riêng**: nó là adapter `MockPaymentGateway` trong module `payments` của API (`apps/api/src/payments/gateway`), nên xuất hiện ở mức component (mục 4), không ở mức container (ADR-006).
+Cổng thanh toán mô phỏng **không phải container riêng**: nó là adapter `MockPaymentGateway` trong module `payments` của API (`apps/api/src/payments/gateway`), nên xuất hiện ở mức component (mục 4), không ở mức container (Mục 7).
 
 ## 4. Kiến trúc phân lớp của backend (NestJS)
 
-Backend là modular monolith: một ứng dụng triển khai duy nhất, chia module theo domain (ADR-002).
+Backend là modular monolith trong monorepo ([ADR-001](adr/001-monorepo.md)): một ứng dụng triển khai duy nhất, chia module theo domain.
 
 ```text
 apps/api/src/
@@ -87,20 +87,20 @@ Mỗi module theo 3 lớp:
 - Quy tắc được kiểm tra tự động trong bước lint của CI (ESLint `no-restricted-imports` hoặc `dependency-cruiser`).
 - Job nền (hủy đơn quá hạn, đối soát payment treo) đặt trong module `payments`, chạy trong container API bằng `@nestjs/schedule`.
 
-**Bảo mật (ADR-007):** JWT HS256 sống ngắn, `JwtAuthGuard` toàn cục kèm `@Public()` cho endpoint công khai, `RolesGuard` cho `CUSTOMER`/`STAFF`, kiểm tra quyền sở hữu đơn trong service, mật khẩu băm bằng bcrypt.
+**Bảo mật ([ADR-002](adr/002-jwt-security.md)):** JWT HS256 sống ngắn, `JwtAuthGuard` toàn cục kèm `@Public()` cho endpoint công khai, `RolesGuard` cho `CUSTOMER`/`STAFF`, kiểm tra quyền sở hữu đơn trong service, mật khẩu băm bằng bcrypt.
 
 ## 5. Frontend Next.js / PWA
 
-- **Mobile-first:** layout ưu tiên màn hình nhỏ, thành phần chạm lớn.
-- **PWA:** `manifest.webmanifest`, service worker cache tài nguyên tĩnh và trang menu; không cache các API có xác thực (đơn hàng, thanh toán).
+- **Mobile-first:** layout ưu tiên màn hình nhỏ (từ 320 px), thành phần chạm chính tối thiểu 48×48 CSS px ([ADR-005](adr/005-Next.js-PWA-stateCart-dataFetching.md)).
+- **PWA:** `manifest.webmanifest`, service worker cache tài nguyên tĩnh và trang công khai; không cache các API có xác thực (đơn hàng, thanh toán).
 - **Gọi API:** lớp `lib/api` tập trung, tự gắn JWT trong header `Authorization`; tự sinh `Idempotency-Key` cho mỗi ý định thanh toán và giữ nguyên key khi retry; đơn mới thì dùng key mới.
-- **Phiên đăng nhập:** khi API trả `401`, chuyển sang trang đăng nhập và giữ giỏ hàng (lưu phía client).
+- **Phiên đăng nhập:** khi API trả `401`, chuyển sang trang đăng nhập và giữ giỏ hàng (lưu phía client bằng `LocalStorage`, có đồng bộ đa tab).
 - **Trạng thái UI:** mọi màn hình dữ liệu đều có loading / empty / error.
-- **Cấu hình:** `NEXT_PUBLIC_API_URL` được nhúng lúc build, nên image web production được build với URL API của production (ADR-008). Không đặt secret trong biến `NEXT_PUBLIC_*`.
+- **Cấu hình:** `NEXT_PUBLIC_API_URL` được nhúng lúc build, nên image web production được build với URL API của production ([ADR-001](adr/001-monorepo.md)). Không đặt secret trong biến `NEXT_PUBLIC_*`.
 
 ## 6. PostgreSQL và cơ chế migration
 
-- Dùng **Prisma** (Prisma Client + Prisma Migrate). Mô hình dữ liệu khai báo trong `apps/api/prisma/schema.prisma` (ADR-003).
+- Dùng **Prisma** (Prisma Client + Prisma Migrate). Mô hình dữ liệu khai báo trong `apps/api/prisma/schema.prisma` ([ADR-003](adr/003-orm-schema-catalog.md)).
 - **Local:** `prisma migrate dev` tạo migration mới. **Production/CI:** `prisma migrate deploy` chỉ áp dụng các migration đã commit (không dùng `migrate dev` hay `db push` ở production); Dockerfile và CI chạy `prisma generate` trước bước build.
 - `prisma migrate deploy` chạy như **một bước riêng trong pipeline deploy** (trong mạng nội bộ trước khi chuyển lưu lượng sang bản mới); thất bại thì pipeline dừng. Có backup/snapshot trước khi migrate nếu nền tảng hỗ trợ.
 - **Seed** bằng `prisma db seed` (`prisma/seed.ts`), idempotent. Dữ liệu tham chiếu (danh mục, sản phẩm, size, topping) được chạy một lần có kiểm soát trên production để menu không rỗng; dữ liệu demo (tài khoản mẫu) chỉ chạy ở local/staging.
@@ -113,15 +113,15 @@ Mỗi module theo 3 lớp:
 - Interface `PaymentGateway` có `charge(request)` (idempotent theo key) và `getStatus(idempotencyKey)` để đối soát sau timeout; timeout biểu diễn bằng `GatewayTimeoutError`.
 - `MockPaymentGateway` (Ví/Thẻ) có hành vi điều khiển bằng số thẻ/ví thử nghiệm: thành công, từ chối, timeout đã trừ tiền, timeout chưa trừ tiền, độ trễ. Trạng thái giao dịch lưu trong bảng riêng `mock_gateway_transactions` để không mất khi API khởi động lại.
 - Chọn provider bằng `PAYMENT_PROVIDER=mock`. Có thể thay bằng cổng thật (VNPay/Stripe…) mà không đổi nghiệp vụ nhờ interface.
-- Xem ADR-006.
+- Phối hợp chặt chẽ với cơ chế idempotency và đối soát giao dịch tại [ADR-004](adr/004-order-payment-consistency.md).
 
 ## 8. Logging, health check, quản lý cấu hình
 
 | Hạng mục | Giải pháp |
 |---|---|
-| Logging | Log JSON có cấu trúc (pino/nestjs-pino), mỗi request có `requestId`, ghi ra stdout; `redact` cho `authorization`, `cookie`, mật khẩu, token; không log số thẻ |
+| Logging | Log JSON có cấu trúc (pino/nestjs-pino), mỗi request có `requestId`, ghi ra stdout; `redact` cho `authorization`, `cookie`, mật khẩu, token; không log số thẻ ([ADR-002](adr/002-jwt-security.md)) |
 | Health check | `GET /health` (readiness: API + kết nối DB, trả 200/503) và `GET /health/live` (liveness, không kiểm tra DB) bằng `@nestjs/terminus`; `/health/live` dùng cho Docker `HEALTHCHECK`, `/health` dùng cho smoke test sau deploy |
-| Cấu hình & cổng | Biến môi trường theo 12-factor; `@nestjs/config` + schema validation, thiếu biến bắt buộc thì app không khởi động; web và API lắng nghe `0.0.0.0:$PORT` trên Render (API fallback `PORT ?? API_PORT ?? 4000`); danh sách biến ở ADR-008 và `.env.example` |
+| Cấu hình & cổng | Biến môi trường theo 12-factor; `@nestjs/config` + schema validation, thiếu biến bắt buộc thì app không khởi động; web và API lắng nghe `0.0.0.0:$PORT` trên Render (API fallback `PORT ?? API_PORT ?? 4000`); danh sách biến ở `.env.example` ([ADR-001](adr/001-monorepo.md)) |
 | Secret | Lưu trong secret của CI/nền tảng triển khai; repo chỉ có `.env.example` |
 
 ## 9. Luồng nghiệp vụ quan trọng: đặt và thanh toán
@@ -135,7 +135,7 @@ Mỗi module theo 3 lớp:
 4. Cập nhật đơn và hoàn kho dùng cập nhật có điều kiện (`WHERE status = 'PENDING_PAYMENT'`, hoàn kho chỉ khi cập nhật ảnh hưởng đúng 1 dòng) để không hoàn kho hai lần. Job nền hủy đơn `PENDING_PAYMENT` quá hạn theo cùng quy tắc, chỉ hủy đơn không có payment `PENDING`/`SUCCESS` hoặc sau khi đối soát.
 5. Client theo dõi trạng thái qua `GET /orders/:id`.
 
-Chi tiết: ADR-004 và sequence diagram [sequence-checkout.puml](../diagrams/sequence-checkout.puml).
+Chi tiết: [ADR-004](adr/004-order-payment-consistency.md) và sequence diagram [sequence-checkout.puml](../diagrams/sequence-checkout.puml).
 
 ## 10. Lý do chọn kiến trúc, ưu điểm, hạn chế, trade-off
 
@@ -145,7 +145,7 @@ Chi tiết: ADR-004 và sequence diagram [sequence-checkout.puml](../diagrams/se
 |---|---|---|
 | Đơn giản triển khai và gỡ lỗi; phù hợp quy mô nhóm và thời gian | Không scale từng module độc lập | Chấp nhận vì tải thấp; ranh giới module rõ nên có thể tách thành service sau này |
 | Transaction ACID trong một DB đảm bảo nhất quán đơn hàng/tồn kho/thanh toán | Một DB là điểm lỗi duy nhất | Đánh đổi lấy tính đúng đắn; bổ sung backup/persistent volume |
-| Monorepo giúp CI/CD, tài liệu và truy vết tập trung | Pipeline phải lọc theo thư mục để tránh build thừa | Lọc theo đường dẫn ở mức job trong một workflow để kiểm tra bắt buộc không bị treo (ADR-001) |
+| Monorepo giúp CI/CD, tài liệu và truy vết tập trung | Pipeline phải lọc theo thư mục để tránh build thừa | Lọc theo đường dẫn ở mức job trong một workflow để kiểm tra bắt buộc không bị treo ([ADR-001](adr/001-monorepo.md)) |
 | Tách web/API cho phép deploy và scale độc lập, tận dụng SSR/PWA | Cần cấu hình CORS, quản lý 2 URL; image web phải build theo môi trường | Dùng biến môi trường, build arg trong pipeline và HTTPS |
 | Cổng thanh toán qua interface dễ thay thế | Mô phỏng chưa phản ánh đầy đủ webhook/3-D Secure | Mô phỏng thêm timeout/lỗi và `getStatus` để kiểm thử idempotency và đối soát |
 | Kiến trúc phân lớp dễ viết unit test | Nhiều lớp hơn cho tính năng nhỏ; truyền `tx` làm chữ ký method dài hơn | Giữ lớp mỏng, tránh trừu tượng thừa |
@@ -153,16 +153,14 @@ Chi tiết: ADR-004 và sequence diagram [sequence-checkout.puml](../diagrams/se
 
 ## 11. Danh sách ADR
 
-| Mã | Quyết định |
-|---|---|
-| 001 | Dùng monorepo và đóng gói Docker (`001-monorepo.md`) |
-| 002 | Backend NestJS dạng modular monolith |
-| 003 | Prisma, schema catalog và migration PostgreSQL (`003-orm-schema-catalog.md`) |
-| 004 | Transaction khi tạo đơn và trừ tồn kho |
-| 005 | Idempotency cho thanh toán |
-| 006 | Dịch vụ thanh toán mô phỏng qua interface |
-| 007 | Xác thực bằng JWT |
-| 008 | Logging, health check, cấu hình |
+| Mã | Quyết định | Tài liệu |
+|---|---|---|
+| 001 | Sử dụng monorepo và đóng gói Docker cho web, API và tài liệu | [001-monorepo.md](adr/001-monorepo.md) |
+| 002 | Xác thực JWT và bảo mật ứng dụng | [002-jwt-security.md](adr/002-jwt-security.md) |
+| 003 | ORM, schema và migration PostgreSQL cho catalog | [003-orm-schema-catalog.md](adr/003-orm-schema-catalog.md) |
+| 004 | Đảm bảo tính nhất quán trong đặt hàng và thanh toán | [004-order-payment-consistency.md](adr/004-order-payment-consistency.md) |
+| 005 | Kiến trúc Frontend Next.js PWA, state giỏ hàng và data fetching | [005-Next.js-PWA-stateCart-dataFetching.md](adr/005-Next.js-PWA-stateCart-dataFetching.md) |
+| 006 | Chiến lược kiểm thử unit, integration và E2E | [006-testing-strategy.md](adr/006-testing-strategy.md) |
 
 ## 12. Truy vết deployment diagram → kiến trúc → mã nguồn
 
@@ -174,5 +172,5 @@ Mỗi container/dịch vụ trong [deployment-render.svg](../diagrams/deployment
 | Web App (Next.js) | Mục 3, 5 | `apps/web`, `apps/web/Dockerfile` | Render Web Service (Docker, `$PORT`) |
 | API (NestJS) | Mục 3, 4, 7, 8 | `apps/api`, `apps/api/Dockerfile` | Render Web Service (Docker, `$PORT`) |
 | PostgreSQL + persistent storage | Mục 3, 6 | `apps/api/prisma/`, `docker-compose.yml` | Render PostgreSQL (Private Network, Persistent Storage) |
-| Container registry | Mục 8 (pipeline) | `.github/workflows` | GitHub Container Registry (GHCR) |
-| Pipeline CI/CD | ADR-001, ADR-008 | `.github/workflows` | GitHub Actions |
+| Container registry | Mục 8, [ADR-001](adr/001-monorepo.md) | `.github/workflows` | GitHub Container Registry (GHCR) |
+| Pipeline CI/CD | [ADR-001](adr/001-monorepo.md), [ADR-006](adr/006-testing-strategy.md) | `.github/workflows` | GitHub Actions |

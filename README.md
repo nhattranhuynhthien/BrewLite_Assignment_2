@@ -11,7 +11,7 @@ BrewLite là ứng dụng đặt đồ uống theo hướng mobile-first, dành 
 - Thanh toán mô phỏng và theo dõi trạng thái, lịch sử đơn hàng.
 - Hỗ trợ nhân viên cập nhật trạng thái đơn; giao diện nhân viên có thể được bổ sung sau MVP.
 
-Cổng thanh toán thật, chương trình khuyến mãi và tích điểm không thuộc phạm vi MVP. Chi tiết phạm vi và yêu cầu được ghi trong [tài liệu bối cảnh và phạm vi](docs/requirements/context-and-scope.md) và [SRS Menu và sản phẩm](docs/requirements/srs-menu-product.md).
+Cổng thanh toán thật, chương trình khuyến mãi và tích điểm không thuộc phạm vi MVP. Chi tiết phạm vi và yêu cầu được ghi trong [tài liệu bối cảnh và phạm vi](docs/requirements/context-and-scope.md) và [SRS tổng quát](docs/requirements/srs.md).
 
 ## Công nghệ
 
@@ -21,7 +21,7 @@ Cổng thanh toán thật, chương trình khuyến mãi và tích điểm khôn
 - Đóng gói môi trường: Docker
 - CI/CD: sẽ được xác định và bổ sung trong quá trình triển khai
 
-Đây là nền tảng theo tài liệu yêu cầu hiện có. Quyết định về ORM, schema và migration được ghi tại [ADR-003](docs/architecture/adr/003-orm-schema-catalog.md); việc triển khai ứng dụng vẫn chưa hoàn tất.
+Đây là nền tảng theo tài liệu yêu cầu hiện có. Kiến trúc tổng thể được mô tả tại [Kiến trúc hệ thống](docs/architecture/architecture.md), còn quyết định về ORM, schema và migration được ghi tại [ADR-003](docs/architecture/adr/003-orm-schema-catalog.md); việc triển khai ứng dụng vẫn chưa hoàn tất.
 
 ## Bắt đầu
 
@@ -65,7 +65,7 @@ File [.env.example](.env.example) liệt kê các biến dự kiến cho môi tr
 - Cấu hình chung: `NODE_ENV`.
 - PostgreSQL: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`, `POSTGRES_HOST`.
 - Kết nối database: `DATABASE_URL`, `TEST_DATABASE_URL`.
-- API: `API_PORT`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PAYMENT_WEBHOOK_SECRET`.
+- API: `API_PORT`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PAYMENT_PROVIDER`, `PAYMENT_WEBHOOK_SECRET`.
 - Web: `PORT`, `NEXT_PUBLIC_API_URL`.
 
 Các giá trị trong `.env.example` chỉ là giá trị mẫu cho local. Không dùng chúng cho production, không ghi secret thật vào code, log hoặc commit, và không commit file `.env`.
@@ -111,10 +111,11 @@ CONTRIBUTING.md # Quy ước branch, commit, pull request và Definition of Done
 
 - [Bối cảnh, stakeholder và phạm vi](docs/requirements/context-and-scope.md)
 - [SRS tổng quát – mã FR/NFR chuẩn](docs/requirements/srs.md)
-- [Use-case tổng quát (PlantUML)](docs/diagrams/use-case-overview.puml) · [SVG](docs/diagrams/use-case-overview.svg)
-- [SRS: Menu và sản phẩm](docs/requirements/srs-menu-product.md)
-- [ADR 003: ORM, schema và migration](docs/architecture/adr/003-orm-schema-catalog.md)
-- [Sơ đồ domain (PUML)](docs/diagrams/class-domain.puml) · [SVG](docs/diagrams/class-domain.svg) · [PNG](docs/diagrams/class-domain.png)
+- [NFR triển khai và vận hành](docs/requirements/deployment-nfr.md)
+- [Đặc tả use-case trọng tâm: Đặt và thanh toán đơn hàng](docs/requirements/use-case-checkout.md)
+- [Kiến trúc hệ thống](docs/architecture/architecture.md) và các quyết định kiến trúc: [ADR-001](docs/architecture/adr/001-monorepo.md) · [ADR-002](docs/architecture/adr/002-jwt-security.md) · [ADR-003](docs/architecture/adr/003-orm-schema-catalog.md) · [ADR-004](docs/architecture/adr/004-order-payment-consistency.md) · [ADR-005](docs/architecture/adr/005-Next.js-PWA-stateCart-dataFetching.md) · [ADR-006](docs/architecture/adr/006-testing-strategy.md)
+- Sơ đồ hệ thống: [Use-case](docs/diagrams/use-case-overview.svg) · [Activity](docs/diagrams/activity.svg) · [Sequence checkout](docs/diagrams/sequence-checkout.svg) · [Class domain](docs/diagrams/class-domain.svg) · [Deployment Render](docs/diagrams/deployment-render.svg)
+- [Ma trận truy vết yêu cầu](docs/traceability-matrix.md)
 - [Quy ước đóng góp và Definition of Done](CONTRIBUTING.md)
 
 ## Đóng góp

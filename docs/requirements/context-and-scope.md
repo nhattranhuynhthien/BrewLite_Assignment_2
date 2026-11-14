@@ -2,11 +2,9 @@
 
 | Mục | Nội dung |
 |---|---|
-| Task | 1.1 – Bối cảnh, stakeholder và phạm vi (issue I-03 / D-01) |
-| Phiên bản | 0.1 (bản nháp để review) |
-| Tác giả | Đỗ Hoàng Vinh (TV3) |
-| Reviewer | TV4 (theo vòng review chéo); TV1 bổ sung phần rủi ro/ràng buộc kỹ thuật |
-| Tài liệu liên quan | `srs-menu-product.md`, `docs/diagrams/class-domain.puml` |
+| Task | 1.1 – Bối cảnh, stakeholder và phạm vi |
+| Phiên bản | 1.0 |
+| Tài liệu liên quan | [SRS tổng quát](./srs.md), [Use-case checkout](./use-case-checkout.md), [Kiến trúc hệ thống](../architecture/architecture.md), [Class diagram](../diagrams/class-domain.puml) |
 
 ## 1. Bối cảnh và vấn đề nghiệp vụ
 
@@ -89,7 +87,7 @@ Xem menu → Chọn tùy chọn → Giỏ hàng → Đặt đơn → Thanh toán
 | A-06 | Thanh toán là mô phỏng: kết quả thành công/thất bại do dịch vụ mô phỏng quyết định, không có tiền thật. |
 | A-07 | Giá do server tính và là nguồn đúng; giá client gửi lên chỉ để hiển thị. |
 | A-08 | Dữ liệu menu mẫu do nhóm tạo, không lấy từ hệ thống bên ngoài. |
-| A-09 | Nhóm triển khai trên một nền tảng có gói miễn phí hoặc chi phí thấp (Render, Railway, Fly.io… do TV1 chốt). |
+| A-09 | Nhóm triển khai trên một nền tảng có gói miễn phí hoặc chi phí thấp (Render – đã chốt trong kiến trúc và sơ đồ triển khai). |
 
 ## 5. Ràng buộc
 
@@ -108,14 +106,14 @@ Xem menu → Chọn tùy chọn → Giỏ hàng → Đặt đơn → Thanh toán
 
 | Mã | Rủi ro | Khả năng | Tác động | Biện pháp giảm thiểu | Phụ trách |
 |---|---|---|---|---|---|
-| R-01 | Mã FR/NFR và mã sơ đồ không thống nhất giữa các thành viên, làm hỏng ma trận truy vết | Cao | Cao | Chốt quy ước mã ngay ngày đầu; TV2 hợp nhất SRS và chốt mã trước khi TV6 điền ma trận | TV2, TV6 |
+| R-01 | Mã FR/NFR và mã sơ đồ không thống nhất giữa các thành viên, làm hỏng ma trận truy vết | Cao | Cao | Chốt quy ước mã ngay ngày đầu; Backend (Auth/SRS) hợp nhất SRS và chốt mã trước khi QA điền ma trận | Backend (Auth), QA |
 | R-02 | Sơ đồ, SRS và code mâu thuẫn nhau (ví dụ class diagram khác entity thực tế) | Trung bình | Cao | Viết code sau khi chốt ADR và kiến trúc; mỗi PR đổi hành vi phải cập nhật tài liệu liên quan | Cả nhóm |
-| R-03 | Nền tảng triển khai chốt muộn, deployment diagram không khớp thực tế | Trung bình | Cao | TV1 chốt nền tảng ở Sprint 0, trước khi vẽ deployment diagram | TV1 |
-| R-04 | Gói miễn phí giới hạn (ngủ khi không dùng, hết hạn DB, giới hạn RAM) làm production không truy cập được lúc chấm | Trung bình | Cao | Kiểm tra production trước ngày chấm; có smoke test và rollback; cân nhắc VPS nhỏ nếu cần | TV1, TV2 |
-| R-05 | Lỗi nghiệp vụ khi đặt đơn: tồn kho âm, đặt trùng, thanh toán hai lần | Trung bình | Cao | Transaction khi tạo đơn và trừ kho; ràng buộc `stock_quantity >= 0`; Idempotency-Key khi thanh toán; integration test | TV3, TV4 |
-| R-06 | Frontend chờ backend nên trễ tiến độ | Trung bình | Trung bình | Công bố hợp đồng Swagger sớm; frontend mock theo hợp đồng | TV3, TV5 |
-| R-07 | Một thành viên quá tải hoặc vắng, công việc phụ thuộc một người (CD, seed) | Trung bình | Trung bình | Đồng sở hữu CD (TV1/TV2); review chéo; cắt Could (Promotion/Loyalty) trước tiên | Cả nhóm |
-| R-08 | Lộ secret (JWT secret, mật khẩu DB) trong repo hoặc log CI | Thấp | Cao | `.env.example` không chứa giá trị thật; dùng secret của CI; rà soát repo và log | TV1, TV2 |
+| R-03 | Nền tảng triển khai chốt muộn, deployment diagram không khớp thực tế | Trung bình | Cao | Tech Lead / DevOps chốt nền tảng trước khi vẽ deployment diagram | Tech Lead / DevOps |
+| R-04 | Gói miễn phí giới hạn (ngủ khi không dùng, hết hạn DB, giới hạn RAM) làm production không truy cập được lúc chấm | Trung bình | Cao | Kiểm tra production trước ngày chấm; có smoke test và rollback; cân nhắc VPS nhỏ nếu cần | Tech Lead / DevOps, Backend (Auth) |
+| R-05 | Lỗi nghiệp vụ khi đặt đơn: tồn kho âm, đặt trùng, thanh toán hai lần | Trung bình | Cao | Transaction khi tạo đơn và trừ kho; ràng buộc `stock_quantity >= 0`; Idempotency-Key khi thanh toán; integration test | Backend (Catalog/Orders) |
+| R-06 | Frontend chờ backend nên trễ tiến độ | Trung bình | Trung bình | Công bố hợp đồng Swagger sớm; frontend mock theo hợp đồng | Backend (Catalog), Frontend (Core) |
+| R-07 | Một thành viên quá tải hoặc vắng, công việc phụ thuộc một người (CD, seed) | Trung bình | Trung bình | Đồng sở hữu CD (Tech Lead / DevOps & Backend Auth); review chéo; cắt Could (Promotion/Loyalty) trước tiên | Cả nhóm |
+| R-08 | Lộ secret (JWT secret, mật khẩu DB) trong repo hoặc log CI | Thấp | Cao | `.env.example` không chứa giá trị thật; dùng secret của CI; rà soát repo và log | Tech Lead / DevOps, Backend (Auth) |
 | R-09 | Tải công việc dồn vào cuối Sprint 2 (E2E, CD, deploy, video) | Cao | Trung bình | Kéo auth, order, Swagger sang Sprint 1; diễn tập rollback trước ngày demo | Cả nhóm |
 
 ## 7. Thuật ngữ
@@ -128,9 +126,3 @@ Xem menu → Chọn tùy chọn → Giỏ hàng → Đặt đơn → Thanh toán
 | ADR | Architecture Decision Record |
 | Idempotency-Key | Khóa để gửi lại yêu cầu thanh toán không tạo thanh toán thứ hai |
 | Snapshot | Bản sao tên/giá tại thời điểm đặt, lưu trong đơn hàng |
-
-## 8. Lịch sử thay đổi
-
-| Phiên bản | Ngày | Tác giả | Thay đổi / Lý do |
-|---|---|---|---|
-| 0.1 | 2026-11-01 | Đỗ Hoàng Vinh | Bản nháp đầu tiên |
