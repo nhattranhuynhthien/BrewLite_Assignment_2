@@ -1,0 +1,66 @@
+@startuml deployment-render
+!pragma layout smetana
+title BrewLite - Render Deployment Topology\nI-08b / D-20 | 2026-11-14 | DRAFT - NOT DEPLOYED
+left to right direction
+skinparam shadowing false
+skinparam wrapWidth 185
+skinparam defaultFontName Arial
+
+node "Customer / Staff Device" as device {
+  artifact "Browser / Next.js PWA" as browser
+}
+
+frame "Local Development (target docker-compose.yml)" {
+  node "web :3000" as localweb
+  node "api :4000" as localapi
+  database "PostgreSQL :5432\npersistent volume" as localdb
+  localweb --> localapi : HTTP REST
+  localapi --> localdb : TCP 5432
+}
+
+frame "GitHub Actions CI/CD (planned - 0 workflows on main)" {
+  node "CI Runner\nInstall -> Lint -> Unit -> Build\nIntegration test + isolated Postgres" as ci
+  artifact "Versioned Docker Images\ncommit SHA / digest" as images
+  ci --> images
+}
+
+cloud "Container Registry\n(conditional / provider TBD)" as registry
+images --> registry : authenticated push
+
+frame "Render Production (platform selected; infra/URLs unverified)" {
+  node "Render HTTPS Ingress :443" as ingress
+  node "Render Web Service\nNext.js Docker Image\n0.0.0.0:$PORT" as web {
+    artifact "apps/web" as webcode
+  }
+  node "Render Web Service\nNestJS Docker Image\n0.0.0.0:$PORT\nMock payment adapter" as api {
+    artifact "apps/api" as apicode
+  }
+  database "Render Postgres\nmanaged persistent storage\nexternal access disabled (target)" as db
+  node "Render Environment Config\nencrypted secret store" as secrets
+  node "Render Health Checker\nGET /health (DB readiness)" as health
+  node "Platform Logs\nredacted JSON stdout" as logs
+  node "Authorized Migration Task\nRender private network\nmechanism TBD per plan" as migration
+
+  ingress --> web : internal route
+  ingress --> api : internal route + CORS
+  api --> db : internal DB URL\nPostgreSQL :5432 / same region
+  secrets ..> web : NEXT_PUBLIC_API_URL (build)\nserver runtime env
+  secrets ..> api : DATABASE_URL, JWT_SECRET,\nCORS_ORIGIN
+  health --> api : GET /health (200 / 503)
+  api --> logs : JSON stdout (no secrets)
+  web --> logs : stdout (no secrets)
+  migration --> db : private connection\nmigrate failure aborts release
+}
+
+browser --> ingress : HTTPS :443\nweb UI + REST API / JWT
+registry ..> web : image pull (if prebuilt)
+registry ..> api : image pull (if prebuilt)
+ci ..> migration : trigger authorized migration\nwait for success before deploy
+ci --> ingress : deploy after gates + migration\nsmoke test /health & /products
+
+note bottom of db
+  Do not expose PostgreSQL publicly for CI migrations.
+  Verify Render-side migration mechanism before implementing CD.
+  No Render account, service, DB, secret or URL is provisioned yet.
+end note
+@enduml
