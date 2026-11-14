@@ -48,14 +48,32 @@ MoSCoW: **Must** bắt buộc, **Should** nên có, **Could** tùy thời gian.
 
 | Mã | Yêu cầu | Ưu tiên |
 |---|---|---|
-| FR-10 | Khách có thể thêm sản phẩm vào giỏ hàng. | Must |
-| FR-11 | Khách có thể chọn size và các topping khả dụng cho từng dòng hàng. | Must |
-| FR-12 | Khách có thể sửa số lượng hoặc lựa chọn của dòng hàng trong giỏ. | Must |
-| FR-13 | Khách có thể xóa một dòng hoặc làm trống giỏ hàng. | Must |
-| FR-14 | Giao diện hiển thị tổng tiền tạm tính từ menu hiện tại; giá trong giỏ chỉ để tham khảo, server tính lại lúc đặt đơn. | Must |
-| FR-15 | Giỏ hàng được giữ ở phía client và được giữ lại khi khách cần đăng nhập trước khi đặt đơn. | Should |
+| FR-10 | Khách thêm món cùng các thuộc tính cấu hình được (size, đường/đá nếu áp dụng, topping) và số lượng vào giỏ; dòng hàng có cùng sản phẩm và toàn bộ tùy chọn giống nhau được gộp số lượng. | Must |
+| FR-11 | Khách xem các món trong giỏ gồm ảnh, tên, tùy chọn, đơn giá, số lượng, thành tiền tạm tính và tổng giỏ; giỏ trống có thông báo riêng. | Must |
+| FR-12 | Khách tăng/giảm hoặc nhập số lượng; thay đổi cập nhật tổng tạm tính, chặn số lượng âm/vượt tồn; giảm về 0 yêu cầu xác nhận xóa. | Must |
+| FR-13 | Khách xóa một dòng hoặc làm trống giỏ; thao tác xóa có xác nhận và giao diện cập nhật đúng trạng thái rỗng. | Must |
+| FR-14 | Giỏ được lưu phía client và giữ lại sau khi đóng/mở trình duyệt, kể cả khi khách cần đăng nhập trước khi đặt hàng. | Should |
+| FR-15 | Khách nhập mã khuyến mãi tại giỏ; hệ thống kiểm tra mã hợp lệ và hiển thị mức giảm/tổng tạm tính mới. Việc xác thực và tính tiền cuối cùng do server thực hiện theo FR-39. | Could |
+| FR-16 | Giao diện mobile-first, responsive từ viewport 320 px trở lên, thích ứng tablet và desktop; vùng chạm chính tối thiểu 48×48 px. | Must |
+| FR-17 | Ứng dụng hỗ trợ cài đặt PWA bằng manifest/service worker và cache ngoại tuyến cơ bản cho trang/tài nguyên tĩnh. | Should |
+| FR-18 | Khi tải dữ liệu, không hiện màn hình trắng; UI có loading, empty và error state thân thiện, kèm hành động tiếp theo như thử lại. | Must |
+| FR-19 | Cung cấp bottom navigation trên mobile, header navigation trên desktop; chuyển trang phía client không làm mất trạng thái ứng dụng không liên quan. | Must |
 
-FR-16…FR-19 để trống.
+Giỏ hàng chỉ lưu phía client (ví dụ LocalStorage), theo kiến trúc hiện tại không có cart API/database và không đồng bộ nhiều thiết bị. Yêu cầu FR-CRT-05 về database sync trong tài liệu thành phần được loại khỏi MVP theo lựa chọn client-only; muốn đưa lại phải cập nhật kiến trúc và phạm vi.
+
+**Tiêu chí chấp nhận FR-10–FR-19**
+
+- **AC-10.1:** Nút thêm chỉ hoạt động khi đã chọn các thuộc tính bắt buộc; thêm thành công cập nhật số lượng trên biểu tượng giỏ ngay lập tức; cùng món/cùng toàn bộ tùy chọn được gộp.
+- **AC-11.1:** Giỏ hiển thị đúng ảnh, tên, tùy chọn, đơn giá, số lượng, thành tiền và tổng; tổng tạm tính bằng tổng `(đơn giá món + phụ thu topping) × số lượng`; giỏ trống có thông báo riêng.
+- **AC-12.1:** Tăng/giảm/nhập số lượng cập nhật tổng; chặn số lượng âm hoặc vượt tồn; giảm về 0 yêu cầu xác nhận xóa.
+- **AC-13.1:** Xóa từng món hoặc làm trống giỏ có bước xác nhận; xóa hết đưa UI về trạng thái trống.
+- **AC-14.1:** Khách vãng lai và khách đăng nhập đều giữ được giỏ LocalStorage sau khi đóng rồi mở lại trình duyệt; không cam kết khôi phục/sync giỏ trên thiết bị khác.
+- **AC-15.1:** Nhập mã khuyến mãi hợp lệ hiển thị số tiền giảm và tổng mới; mã không hợp lệ bị báo rõ; server vẫn xác thực và tính lại tổng cuối khi đặt đơn.
+- **AC-16.1:** Bố cục hoạt động từ viewport 320 px trở lên trên mobile, tablet, desktop; vùng chạm chính ít nhất 48×48 CSS px.
+- **AC-17.1:** Trình duyệt có thể đề nghị cài PWA lên màn hình chính; khi ngoại tuyến, các trang/tài nguyên tĩnh cơ bản đã cache vẫn mở được.
+- **AC-18.1:** API đang tải hiện skeleton/spinner thay vì màn hình trắng; empty và error có nội dung riêng cùng hướng xử lý/thử lại.
+- **AC-19.1:** Mobile có bottom navigation, desktop có header navigation; chuyển trang phía client không làm mất trạng thái cần giữ của ứng dụng/giỏ hàng.
+
 
 ### 3.3 Xác thực và phân quyền (`FR-20`–`FR-29`)
 
@@ -94,51 +112,107 @@ FR-25…FR-29 để trống. Đăng xuất phía client kết thúc phiên bằn
 | FR-43 | Nhân viên có thể cập nhật trạng thái đơn theo luồng hợp lệ sau thanh toán (`PAID` → `PREPARING` → `READY` → `COMPLETED`). | Must |
 | FR-44 | Hệ thống từ chối cập nhật trạng thái không hợp lệ hoặc do người dùng không đủ quyền. | Must |
 
-FR-45…FR-49 để trống. Theo dõi trạng thái bằng cách tải/làm mới dữ liệu; thông báo đẩy không thuộc MVP.
+Payment có trạng thái riêng `PENDING`, `SUCCESS`, `FAILED`; `PENDING` không được hiển thị thành công. Staff không tự sửa trạng thái thanh toán hoặc cập nhật đơn đang `PENDING_PAYMENT`. FR-45…FR-49 để trống.
+Tiêu chí trọng yếu: lịch sử mặc định 20 đơn/trang, chỉ gồm đơn của khách đang đăng nhập; chi tiết dùng snapshot và trả 401/403/404 phù hợp; polling mỗi 5 giây khi trang hiển thị, dừng ở trạng thái cuối/ra trang và không gửi chồng; cập nhật trạng thái cạnh tranh trên dữ liệu cũ trả 409, UI tải lại thay vì tự gửi tiếp. Tiêu chí chi tiết nằm tại [`srs-order-history-status.md`](./srs-order-history-status.md).
 
 ## 4. Yêu cầu phi chức năng
 
 | Mã chuẩn | Nhóm | Yêu cầu và tiêu chí nghiệm thu | Ưu tiên |
 |---|---|---|---|
-| NFR-01 | Hiệu năng | Với dữ liệu seed ≤200 sản phẩm, 50 kết nối đồng thời trong 30 giây: p95 `GET /products` ≤300 ms và `POST /orders` ≤500 ms, không tính độ trễ giả lập gateway. | Should |
-| NFR-02 | Toàn vẹn và đồng thời | Giá là số nguyên VND; tồn kho không âm; tạo đơn/trừ kho all-or-nothing; đồng thời không bán vượt tồn; mỗi đơn tối đa một payment SUCCESS. | Must |
-| NFR-03 | Bảo mật | Mật khẩu được băm; API yêu cầu JWT và kiểm tra quyền sở hữu/vai trò; chỉ tin giá phía server; không ghi log mật khẩu, JWT, secret hoặc dữ liệu thanh toán nhạy cảm. | Must |
-| NFR-04 | Phục hồi giao dịch | Timeout/lỗi gateway không làm mất hoặc tính trùng giao dịch; trạng thái payment/đơn có thể đối soát; hoàn kho/hủy đơn chỉ thực hiện tối đa một lần. | Must |
-| NFR-05 | Trải nghiệm UI | Màn hình dữ liệu có loading/empty/error; thao tác gửi bị khóa khi đang xử lý; thông báo nêu nguyên nhân và giữ giỏ khi chuyển sang đăng nhập. | Should |
-| NFR-06 | Hợp đồng API | Hợp đồng request/response cho API sản phẩm, đơn, thanh toán, xác thực và mã lỗi liên quan được công bố bằng Swagger/OpenAPI, khớp hành vi API. | Must |
-| NFR-07 | Khả năng kiểm thử | Unit test bao phủ định giá, tồn kho, chuyển trạng thái và idempotency; integration test PostgreSQL bao phủ đặt đơn/thanh toán, lỗi, đồng thời và timeout; test chạy trong CI. | Must |
-| NFR-08 | CI | PR được kiểm tra tự động install, lint, unit test và build cho web/API; không merge khi kiểm tra bắt buộc thất bại. | Must |
-| NFR-09 | Chạy local và tái tạo dữ liệu | Docker Compose khởi chạy web/API/PostgreSQL; database mới có thể migrate/seed theo README và menu/API truy cập được; PostgreSQL dùng persistent volume. | Must |
-| NFR-10 | Health check | `GET /health` trả 200 khi API và DB sẵn sàng, 503 khi DB không sẵn sàng; smoke test sau deploy kiểm tra health và menu. | Must |
-| NFR-11 | Cấu hình và secrets | Cấu hình lấy từ môi trường; repository chỉ có `.env.example`; secret thật không xuất hiện trong Git hoặc log CI/CD. | Must |
-| NFR-12 | Phát hành và rollback | Deploy có quality gate, image/tag theo phiên bản, migration trước khi chuyển lưu lượng, smoke test sau deploy; lỗi thì dừng và có hướng dẫn rollback an toàn. | Must |
-| NFR-13 | Production | Web production truy cập qua HTTPS; database production có persistent storage và không public trực tiếp; deployment diagram phản ánh hạ tầng thực tế. | Must |
-| NFR-14 | Bàn giao | Có release/tag và hướng dẫn chạy, test, build, deploy, rollback đủ để người ngoài nhóm kiểm tra hệ thống. | Must |
+| NFR-01 | Hiệu năng menu | Với tối đa 200 sản phẩm seed và 50 kết nối đồng thời trong 30 giây, p95 `GET /products` ≤300 ms. | Should |
+| NFR-02 | Hiệu năng tạo đơn | Với dữ liệu seed và 50 kết nối đồng thời trong 30 giây, p95 `POST /orders` ≤500 ms; không tính độ trễ giả lập gateway. | Should |
+| NFR-03 | Hiệu năng lịch sử/trạng thái | Dataset: 100 khách, 1.000 đơn, một khách có 100 đơn, mỗi đơn 1–5 dòng. API đọc đo 60 giây/20 kết nối; API cập nhật đo riêng 60 giây/5 kết nối và đơn riêng biệt. p95 mỗi API ≤500 ms, không có 5xx/timeout. | Should |
+| NFR-04 | Hiệu năng giao diện | Thao tác giỏ hàng phía client phản hồi <100 ms; điểm Lighthouse Performance ≥80 và thời gian tải trang đầu <2 giây. | Must |
+| NFR-05 | Độ trễ hiển thị trạng thái | Khi trang đang hiển thị, mạng bình thường và API phản hồi ≤500 ms, trạng thái mới xuất hiện trong ≤7 giây; kiểm tra 10 lần chuyển hợp lệ. | Should |
+| NFR-06 | Toàn vẹn và đồng thời | Giá là VND nguyên, tồn kho không âm; tạo đơn/trừ kho all-or-nothing; không bán vượt tồn hoặc tính tiền hai lần; mỗi đơn tối đa một payment `SUCCESS`; cập nhật LocalStorage nhiều tab không âm thầm làm mất thay đổi. | Must |
+| NFR-07 | Bảo mật và logging | Mật khẩu được băm; API kiểm tra JWT, chủ sở hữu và vai trò; đơn gắn với chủ lấy từ JWT; chỉ tin giá server; không ghi log mật khẩu, JWT, secret hoặc dữ liệu thanh toán nhạy cảm. | Must |
+| NFR-08 | Phục hồi giao dịch | Timeout/lỗi gateway có thể đối soát, không làm mất/trùng giao dịch; hoàn kho/hủy đơn tối đa một lần. | Must |
+| NFR-09 | Trạng thái/phản hồi UI | UI phân biệt loading/empty/error, không hiện màn hình trắng; có thông báo và hành động phù hợp; lỗi đọc có thể thử lại; không báo thành công giả hoặc gửi lặp cập nhật staff. | Must |
+| NFR-10 | Khả dụng và usability | UI tiếng Việt, dễ hiểu, người dùng hoàn tất luồng đặt hàng trong <2 phút; hỗ trợ viewport từ 320 px, kiểm tra lịch sử ở 360/390 px không cuộn ngang; vùng chạm chính ≥48×48 CSS px; trạng thái không chỉ phân biệt bằng màu. | Must |
+| NFR-11 | Tương thích trình duyệt | Giao diện hiển thị đúng, không lỗi layout trên các phiên bản mới nhất của Chrome, Safari, Firefox và Edge. | Must |
+| NFR-12 | Hợp đồng API | Hợp đồng request/response cho API sản phẩm, xác thực, đơn, thanh toán và cập nhật trạng thái được công bố bằng Swagger/OpenAPI, khớp hành vi thực tế. | Must |
+| NFR-13 | Khả năng kiểm thử | Unit/integration test bao phủ định giá, tồn kho, trạng thái, idempotency, quyền, thanh toán và các trạng thái UI quan trọng; test chạy trong CI. | Must |
+| NFR-14 | CI | PR chạy install, lint, unit test và build cho web/API; không merge khi kiểm tra bắt buộc thất bại. | Must |
+| NFR-15 | Chạy local/tái tạo dữ liệu | Docker Compose khởi chạy web/API/PostgreSQL; database mới migrate/seed theo README; PostgreSQL dùng persistent volume. | Must |
+| NFR-16 | Health check | `GET /health` trả 200 khi API và DB sẵn sàng, 503 khi DB không sẵn sàng; smoke test sau deploy kiểm tra health và menu. | Must |
+| NFR-17 | Cấu hình/secrets | Cấu hình lấy từ môi trường; secret thật không xuất hiện trong repository hoặc log CI/CD. | Must |
+| NFR-18 | Phát hành/rollback | Deploy có quality gate, image/tag phiên bản, migration trước khi chuyển lưu lượng, smoke test sau deploy; khi lỗi phải dừng và có hướng dẫn rollback. | Must |
+| NFR-19 | Production | Web production dùng HTTPS; database có persistent storage, không public trực tiếp; sơ đồ triển khai phản ánh hạ tầng thực tế. | Must |
+| NFR-20 | Bàn giao | Có release/tag, release notes và hướng dẫn chạy, test, build, deploy, rollback cho người ngoài nhóm. | Must |
+
+**Tiêu chí đo và chấp nhận NFR-03–NFR-11**
+
+- **NFR-03:** Dùng PostgreSQL thật, dataset 100 khách/1.000 đơn (một khách có 100 đơn, mỗi đơn 1–5 dòng); làm nóng 10 giây rồi đo API đọc 60 giây với 20 kết nối và trang 20 đơn; đo API cập nhật riêng 60 giây/5 kết nối trên các đơn khác nhau. Mỗi API p95 ≤500 ms, không 5xx/timeout. Báo cáo ghi cấu hình máy/phần mềm/commit/tải/request/kết quả, không loại request lỗi.
+- **NFR-04:** Thao tác thêm/xóa/đổi số lượng phía client phản hồi <100 ms; Lighthouse Performance ≥80 và tải trang đầu <2 giây.
+- **NFR-05:** Đo từ lúc cập nhật trạng thái server commit đến lúc UI hiện nhãn mới; trang ở foreground, API ≤500 ms; phân bố 10 lần trong chu kỳ polling và cả 10 lần ≤7 giây.
+- **NFR-06:** Kiểm tra giá nguyên VND, CHECK tồn kho không âm, transaction rollback, chỉ một payment thành công, đồng thời đặt cùng sản phẩm không oversell; thao tác nhiều tab trên LocalStorage không âm thầm mất dữ liệu.
+- **NFR-09:** Với API trì hoãn 2 giây thấy loading; giỏ/lịch sử rỗng có empty state; lỗi có error state và retry riêng. Retry chỉ đọc lại dữ liệu, không tạo đơn/thanh toán/chuyển trạng thái. Lỗi 401 không tiếp tục lộ dữ liệu được bảo vệ.
+- **NFR-10:** UI tiếng Việt; người dùng hoàn tất luồng đặt hàng trong <2 phút; layout hỗ trợ từ 320 px, kiểm tra history tại 360/390 px không cuộn ngang; hành động chính ≥48×48 px; nhãn trạng thái phân biệt bằng chữ, không chỉ màu.
+- **NFR-11:** Chạy kiểm tra layout/chức năng trên phiên bản mới nhất của Chrome, Safari, Firefox và Edge.
+
+**Tính khả dụng:** NFR-10 nói về usability của giao diện; NFR-16 là readiness health check. Các tài liệu nguồn không đặt tỷ lệ uptime/SLA, nên SRS này không tự cam kết uptime.
 
 ### 4.1 Ánh xạ mã NFR từ tài liệu thành phần
 
+| Mã nguồn | Mã chuẩn / xử lý |
+|---|---|
+| `FR-CRT-01` | FR-10 |
+| `FR-CRT-02` | FR-11 |
+| `FR-CRT-03` | FR-12 |
+| `FR-CRT-04` | FR-13 |
+| `FR-CRT-05` | FR-14 phần lưu client-side; yêu cầu lưu database/đồng bộ nhiều thiết bị không thuộc MVP theo quyết định kiến trúc |
+| `FR-CRT-06` | FR-15 (nhập mã ở UI) và FR-39 (server áp dụng/tính lại tổng) |
+| `FR-UI-01` | FR-16 |
+| `FR-UI-02` | FR-17 |
+| `FR-UI-03`, `FR-UI-04` | FR-18 |
+| `FR-UI-05` | FR-19 |
+
+FR-40…FR-44 đã dùng mã chuẩn trong tài liệu lịch sử/trạng thái; giữ nguyên.
+### 4.2 Ánh xạ mã NFR từ tài liệu thành phần
+
 | Mã cũ trong tài liệu thành phần | Mã chuẩn |
 |---|---|
-| Menu `NFR-01` | NFR-01 |
-| Menu `NFR-02` | NFR-02 |
-| Menu `NFR-03` | NFR-06 |
-| Menu `NFR-04` | NFR-07 |
-| `NFR-ORD-01` | NFR-02 |
-| `NFR-ORD-02` | NFR-03 |
-| `NFR-ORD-03` | NFR-04 |
-| `NFR-ORD-04` | NFR-01 |
-| `NFR-ORD-05` | NFR-05 |
-| `NFR-ORD-06` | NFR-06 |
-| `NFR-ORD-07` | NFR-07 |
-| `NFR-DEP-01` | NFR-08 |
-| `NFR-DEP-02` | NFR-09 |
-| `NFR-DEP-03` | NFR-10 |
-| `NFR-DEP-04` | NFR-03 |
-| `NFR-DEP-05` | NFR-11 |
-| `NFR-DEP-06` | NFR-12 |
-| `NFR-DEP-07` | NFR-13 |
-| `NFR-DEP-08` | NFR-14 |
+| Menu `NFR-01` (hiệu năng) | NFR-01 |
+| Menu `NFR-02` (toàn vẹn) | NFR-06 |
+| Menu `NFR-03` (API) | NFR-12 |
+| Menu `NFR-04` (kiểm thử) | NFR-13 |
+| `NFR-CRT-01` (hiệu năng giỏ) / `NFR-UI-01` (hiệu năng UI) | NFR-04 |
+| `NFR-CRT-02` (toàn vẹn giỏ) | NFR-06 |
+| `NFR-CRT-03` (bảo mật giỏ server-side) | Không áp dụng cho cart client-only; bảo vệ thao tác tạo đơn theo NFR-07 |
+| `NFR-UI-02` (usability) / `NFR-HIS-03` (mobile usability) | NFR-10 |
+| `NFR-UI-03` (browser compatibility) | NFR-11 |
+| `NFR-HIS-01` (hiệu năng API) | NFR-03 |
+| `NFR-HIS-02` (độ trễ trạng thái) | NFR-05 |
+| `NFR-HIS-04` (phản hồi UI) | NFR-09 |
+| `NFR-ORD-01` (toàn vẹn) | NFR-06 |
+| `NFR-ORD-02` (bảo mật) | NFR-07 |
+| `NFR-ORD-03` (phục hồi) | NFR-08 |
+| `NFR-ORD-04` (hiệu năng tạo đơn) | NFR-02 |
+| `NFR-ORD-05` (UI) | NFR-09 |
+| `NFR-ORD-06` (API) | NFR-12 |
+| `NFR-ORD-07` (kiểm thử) | NFR-13 |
+| `NFR-DEP-01` (CI) | NFR-14 |
+| `NFR-DEP-02` (local) | NFR-15 |
+| `NFR-DEP-03` (health) | NFR-16 |
+| `NFR-DEP-04` (logging) | NFR-07 |
+| `NFR-DEP-05` (secrets) | NFR-17 |
+| `NFR-DEP-06` (deploy/rollback) | NFR-18 |
+| `NFR-DEP-07` (production) | NFR-19 |
+| `NFR-DEP-08` (bàn giao) | NFR-20 |
 
+**Chỉ tiêu/kiểm tra UI được hợp nhất từ SRS giỏ hàng và giao diện**
+
+- Giỏ hàng: chọn đủ thuộc tính mới cho thêm món; các lựa chọn giống nhau được gộp; công thức tổng tạm tính là tổng `(đơn giá + phụ thu topping) × số lượng`; giảm về 0 và xóa toàn bộ cần xác nhận; chặn số lượng âm/vượt tồn.
+- Lưu giỏ: đóng/mở lại trình duyệt vẫn giữ giỏ client-side. Không lưu giỏ vào database hoặc đồng bộ nhiều thiết bị theo kiến trúc hiện tại.
+- PWA: trình duyệt có thể đề nghị cài lên màn hình chính; khi ngoại tuyến chỉ cache trang/tài nguyên tĩnh cơ bản.
+- Giao diện: không màn hình trắng khi chờ API; empty/error có hướng dẫn/thử lại; bottom navigation trên mobile, header trên desktop; client-side navigation không làm mất trạng thái cần giữ.
+- Lịch sử: mặc định 20 đơn mỗi trang, đơn mới trước; khách chỉ xem đơn của mình; snapshot không đổi theo menu; loading/empty/error và 401/403/404 hiển thị đúng trạng thái.
+- Trạng thái: polling mỗi 5 giây, không chồng request và dừng khi rời trang/đơn kết thúc; lỗi mạng giữ dữ liệu tốt gần nhất; nhân viên chỉ có bước chuyển hợp lệ, lỗi 409 phải tải lại thay vì gửi lại tự động.
+- Kiểm tra hiệu năng lịch sử: 100 khách/1.000 đơn, một khách có 100 đơn, 1–5 dòng/đơn; API đọc 20 kết nối và API cập nhật 5 kết nối; đo 60 giây sau khi chuẩn bị dữ liệu, p95 ≤500 ms và không có 5xx/timeout.
+- Kiểm tra độ trễ trạng thái: 10 lần chuyển hợp lệ, API ≤500 ms, trang đang hiển thị; cả 10 lần phải hiện trạng thái mới trong ≤7 giây.
+- Kiểm tra usability lịch sử: viewport 360/390 px không cuộn ngang; nhãn trạng thái tiếng Việt bằng chữ; tiền VND và thời gian theo `Asia/Ho_Chi_Minh`; thao tác chính mở đơn bằng một lần chọn và nút ≥48×48 px.
+
+Tiêu chí Given/When/Then đầy đủ của giỏ hàng/UI và lịch sử/trạng thái vẫn được giữ tại [`srs-giohang-giaodien.md`](./srs-giohang-giaodien.md) và [`srs-order-history-status.md`](./srs-order-history-status.md), đồng thời các yêu cầu, chỉ tiêu và tiêu chí hợp nhất ở trên là nguồn chuẩn trong tài liệu này.
 ## 5. Use-case tổng quát và truy vết
 
 Nguồn sơ đồ: [`use-case-overview.puml`](../diagrams/use-case-overview.puml); bản SVG: [`use-case-overview.svg`](../diagrams/use-case-overview.svg).
