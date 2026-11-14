@@ -5,14 +5,14 @@
 | Phiên bản | 1.0 – hợp nhất từ phạm vi, SRS menu/sản phẩm, SRS đặt hàng/thanh toán và yêu cầu triển khai |
 | Trạng thái | Bộ mã FR/NFR chính thức dùng chung trong repository |
 | Phạm vi | MVP đặt đồ uống tại quầy; thanh toán mô phỏng; một cửa hàng |
-| Nguồn | [`context-and-scope.md`](./context-and-scope.md), [`srs-menu-product.md`](./srs-menu-product.md), [`srs-order-payment.md`](./srs-order-payment.md), [`deployment-nfr.md`](./deployment-nfr.md), [`architecture.md`](../architecture/architecture.md), README |
+| Nguồn | [`context-and-scope.md`](./context-and-scope.md), [`deployment-nfr.md`](./deployment-nfr.md), [`architecture.md`](../architecture/architecture.md), [`README.md`](../../README.md) (đã hợp nhất và thay thế `srs-menu-product.md`, `srs-order-payment.md`, `srs-giohang-giaodien.md`, `srs-order-history-status.md`) |
 
 > **Căn cứ triển khai:** tại thời điểm hợp nhất, `apps/api`, `apps/web` và `tests` chỉ chứa `.gitkeep`; README cũng ghi rõ ứng dụng chưa được triển khai. Vì vậy, SRS này chuẩn hóa yêu cầu từ tài liệu và kiến trúc đã duyệt, không khẳng định tính năng đã có trong mã chạy được.
 
 ## 1. Quy ước mã
 
 - Mã `FR-01`…`FR-39` và `NFR-01`…`NFR-14` là mã chuẩn, duy nhất cho toàn dự án.
-- Các dải FR giữ nguyên quy ước phân nhóm: `01–09` menu/sản phẩm; `10–19` giỏ hàng; `20–24` xác thực; `25–34` đặt hàng/thanh toán; `34–39` lịch sử/trạng thái đơn. Mã chưa dùng được để trống, không tái sử dụng cho yêu cầu khác.
+- Các dải FR giữ nguyên quy ước phân nhóm: `01–09` menu/sản phẩm; `10–19` giỏ hàng; `20–24` xác thực; `25–34` đặt hàng/thanh toán; `35–39` lịch sử/trạng thái đơn. Mã chưa dùng được để trống, không tái sử dụng cho yêu cầu khác.
 - NFR được đánh số lại liên tục để loại bỏ các mã cục bộ trùng hoặc không đồng nhất. Bảng ánh xạ NFR cũ ở mục 4 phục vụ truy vết; chỉ mã NFR chuẩn được dùng khi tạo yêu cầu mới.
 - FR-09 là mã Won't được giữ duy nhất để lưu quyết định loại bỏ quản trị catalog; Won't và nội dung ngoài phạm vi khác không được cấp mã FR/NFR.
 
@@ -111,7 +111,7 @@ Giỏ hàng chỉ lưu phía client (ví dụ LocalStorage), theo kiến trúc h
 | FR-39 | Hệ thống từ chối cập nhật trạng thái không hợp lệ hoặc do người dùng không đủ quyền. | Must |
 
 Payment có trạng thái riêng `PENDING`, `SUCCESS`, `FAILED`; `PENDING` không được hiển thị thành công. Staff không tự sửa trạng thái thanh toán hoặc cập nhật đơn đang `PENDING_PAYMENT`.
-Tiêu chí trọng yếu: lịch sử mặc định 20 đơn/trang, chỉ gồm đơn của khách đang đăng nhập; chi tiết dùng snapshot và trả 401/403/404 phù hợp; polling mỗi 5 giây khi trang hiển thị, dừng ở trạng thái cuối/ra trang và không gửi chồng; cập nhật trạng thái cạnh tranh trên dữ liệu cũ trả 409, UI tải lại thay vì tự gửi tiếp. Tiêu chí chi tiết nằm tại [`srs-order-history-status.md`](./srs-order-history-status.md).
+Tiêu chí trọng yếu: lịch sử mặc định 20 đơn/trang, chỉ gồm đơn của khách đang đăng nhập; chi tiết dùng snapshot và trả 401/403/404 phù hợp; polling mỗi 5 giây khi trang hiển thị, dừng ở trạng thái cuối/ra trang và không gửi chồng; cập nhật trạng thái cạnh tranh trên dữ liệu cũ trả 409, UI tải lại thay vì tự gửi tiếp. Tiêu chí đo và kiểm tra chi tiết được hợp nhất tại Mục 4 trong tài liệu này.
 
 ## 4. Yêu cầu phi chức năng
 
@@ -162,7 +162,7 @@ Tiêu chí trọng yếu: lịch sử mặc định 20 đơn/trang, chỉ gồm 
 - Kiểm tra độ trễ trạng thái: 10 lần chuyển hợp lệ, API ≤500 ms, trang đang hiển thị; cả 10 lần phải hiện trạng thái mới trong ≤7 giây.
 - Kiểm tra usability lịch sử: viewport 360/390 px không cuộn ngang; nhãn trạng thái tiếng Việt bằng chữ; tiền VND và thời gian theo `Asia/Ho_Chi_Minh`; thao tác chính mở đơn bằng một lần chọn và nút ≥48×48 px.
 
-Tiêu chí Given/When/Then đầy đủ của giỏ hàng/UI và lịch sử/trạng thái vẫn được giữ tại [`srs-giohang-giaodien.md`](./srs-giohang-giaodien.md) và [`srs-order-history-status.md`](./srs-order-history-status.md), đồng thời các yêu cầu, chỉ tiêu và tiêu chí hợp nhất ở trên là nguồn chuẩn trong tài liệu này.
+Các yêu cầu, tiêu chí chấp nhận và chỉ tiêu hợp nhất cho giỏ hàng/UI và lịch sử/trạng thái ở Mục 3.2, Mục 3.5 và Mục 4 là nguồn chuẩn trong tài liệu này (thay thế các bản nháp thành phần trước hợp nhất).
 ## 5. Use-case tổng quát và truy vết
 
 Nguồn sơ đồ: [`use-case-overview.puml`](../diagrams/use-case-overview.puml); bản SVG: [`use-case-overview.svg`](../diagrams/use-case-overview.svg).
@@ -174,7 +174,7 @@ Nguồn sơ đồ: [`use-case-overview.puml`](../diagrams/use-case-overview.puml
 | UC-03 Quản lý giỏ hàng | Khách hàng | FR-10…FR-15 |
 | UC-04 Đăng ký/đăng nhập | Khách hàng, Nhân viên | FR-20…FR-24 |
 | UC-05 Xem lịch sử/theo dõi đơn | Khách hàng | FR-35, FR-36 |
-| UC-06 Xử lý đơn tại quầy | Nhân viên | FR-37…FR-37 |
+| UC-06 Xử lý đơn tại quầy | Nhân viên | FR-37…FR-39 |
 
 Đặc tả luồng checkout chi tiết tại [`use-case-checkout.md`](./use-case-checkout.md); sơ đồ trình tự tại [`sequence-checkout.puml`](../diagrams/sequence-checkout.puml).
 
