@@ -31,6 +31,6 @@ Bảng đặc tả Use Case
 
 * **E1:** Chưa đăng nhập/token hết hạn (bước 2) → chuyển sang trang đăng nhập, giữ giỏ hàng.
 * **E2:** Hết hàng (bước 3 hoặc 5) → báo món nào hết, không tạo đơn, cho khách chỉnh giỏ.
-* **E3:** Thanh toán thất bại (bước 7) → đơn chuyển “Thanh toán thất bại”, hoàn lại tồn kho, cho thử lại.
+* **E3:** Thanh toán thất bại (bước 7) → hệ thống chuyển đơn sang PAYMENT_FAILED, hoàn lại tồn kho đúng một lần và thông báo lỗi. Giỏ hàng được giữ nguyên để khách có thể tạo đơn mới và thanh toán lại; không cho thanh toán lại trên đơn đã PAYMENT_FAILED
 * **E4:** Khách gửi lại yêu cầu thanh toán (bấm 2 lần/mạng chập chờn) → hệ thống dùng idempotency key, trả kết quả cũ, không trừ tiền lần hai.
 * **E5:** Payment Service timeout → đơn ở trạng thái chờ, kiểm tra lại trạng thái giao dịch.
