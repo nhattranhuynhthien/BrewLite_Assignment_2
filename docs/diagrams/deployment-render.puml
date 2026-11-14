@@ -1,0 +1,59 @@
+@startuml deployment-render
+!pragma layout smetana
+title BrewLite - Production Deployment Diagram (Render)
+left to right direction
+skinparam shadowing false
+skinparam wrapWidth 190
+skinparam defaultFontName Arial
+
+node "Customer / Staff Device" as device {
+  artifact "Browser / Next.js PWA" as browser
+}
+
+frame "Local Development (docker-compose.yml)" {
+  node "web :3000 (Next.js)" as localweb
+  node "api :4000 (NestJS)" as localapi
+  database "PostgreSQL :5432\npersistent volume" as localdb
+  localweb --> localapi : HTTP REST
+  localapi --> localdb : TCP 5432
+}
+
+frame "CI/CD (GitHub Actions)" {
+  node "CI / CD Pipeline\nInstall -> Lint -> Test -> Build\nBuild Docker Images (commit SHA)" as ci
+}
+
+cloud "Container Registry\n(GHCR - ghcr.io)" as registry
+ci --> registry : push SHA-tagged images
+
+frame "Render Production" {
+  node "Render HTTPS Ingress :443" as ingress
+  node "Render Web Service\nNext.js Docker Container\n0.0.0.0:$PORT" as web {
+    artifact "apps/web" as webcode
+  }
+  node "Render Web Service\nNestJS Docker Container\n0.0.0.0:$PORT\nMockPaymentGateway" as api {
+    artifact "apps/api" as apicode
+  }
+  database "Render PostgreSQL\nManaged Persistent Storage\nPrivate Network :5432\nExternal Access Disabled" as db
+  node "Render Env & Secrets\nEncrypted Environment Store" as secrets
+  node "Render Health Check\nGET /health (200 / 503)" as health
+  node "Platform Logs\nRedacted JSON stdout" as logs
+  node "Prisma Migrate Deploy\nPrivate Network Pre-Rollout Task" as migration
+
+  ingress --> web : internal route
+  ingress --> api : internal route + CORS
+  api --> db : internal DB URL :5432\n(same region)
+  secrets ..> web : NEXT_PUBLIC_API_URL (build)\nruntime env
+  secrets ..> api : DATABASE_URL, JWT_SECRET,\nCORS_ORIGIN
+  health --> api : GET /health
+  api --> logs : structured JSON stdout
+  web --> logs : stdout logs
+  migration --> db : private connection\nfail aborts deploy
+}
+
+browser --> ingress : HTTPS :443\nPWA + REST API / JWT
+registry ..> web : pull web image
+registry ..> api : pull api image
+ci ..> migration : run migration before rollout
+ci --> ingress : trigger deploy + smoke test\n(/health & /products)
+
+@enduml

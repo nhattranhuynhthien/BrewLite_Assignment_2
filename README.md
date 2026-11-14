@@ -21,7 +21,7 @@ Cổng thanh toán thật, chương trình khuyến mãi và tích điểm khôn
 - Đóng gói môi trường: Docker
 - CI/CD: sẽ được xác định và bổ sung trong quá trình triển khai
 
-Đây là nền tảng theo tài liệu yêu cầu hiện có; các quyết định kiến trúc vẫn cần được nhóm review và chốt. Xem [ADR về ORM và schema](docs/architecture/adr/003-orm-schema-catalog.md).
+Đây là nền tảng theo tài liệu yêu cầu hiện có. Quyết định về ORM, schema và migration được ghi tại [ADR-003](docs/architecture/adr/003-orm-schema-catalog.md); việc triển khai ứng dụng vẫn chưa hoàn tất.
 
 ## Bắt đầu
 
@@ -72,7 +72,7 @@ Các giá trị trong `.env.example` chỉ là giá trị mẫu cho local. Khôn
 
 ## Migration và dữ liệu mẫu
 
-Quy trình migration và seed chưa được triển khai. Theo đề xuất trong [ADR 003: ORM, schema và migration](docs/architecture/adr/003-orm-schema-catalog.md), schema sẽ được quản lý bằng migration; không dùng `synchronize` để tự thay đổi schema. Migration và seed cần được cập nhật cùng hướng dẫn lệnh sau khi backend được thiết lập.
+Quy trình migration và seed chưa được triển khai. Theo [ADR-003: ORM, schema và migration](docs/architecture/adr/003-orm-schema-catalog.md), schema được quản lý bằng Prisma Migrate; không dùng `db push` làm nguồn schema chung. Migration và seed cần được cập nhật cùng hướng dẫn lệnh sau khi backend được thiết lập.
 
 ## Chạy ứng dụng khi phát triển
 
@@ -114,7 +114,7 @@ CONTRIBUTING.md # Quy ước branch, commit, pull request và Definition of Done
 - [Use-case tổng quát (PlantUML)](docs/diagrams/use-case-overview.puml) · [SVG](docs/diagrams/use-case-overview.svg)
 - [SRS: Menu và sản phẩm](docs/requirements/srs-menu-product.md)
 - [ADR 003: ORM, schema và migration](docs/architecture/adr/003-orm-schema-catalog.md)
-- [Sơ đồ domain](docs/diagrams/class-domain.svg)
+- [Sơ đồ domain (PUML)](docs/diagrams/class-domain.puml) · [SVG](docs/diagrams/class-domain.svg) · [PNG](docs/diagrams/class-domain.png)
 - [Quy ước đóng góp và Definition of Done](CONTRIBUTING.md)
 
 ## Đóng góp

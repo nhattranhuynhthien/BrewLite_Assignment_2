@@ -9,7 +9,7 @@ Bảng đặc tả Use Case
 | **Tiền điều kiện** | Đã đăng nhập; giỏ hàng có ít nhất 1 món |
 | **Hậu điều kiện (thành công)** | Đơn được tạo, tồn kho đã trừ, thanh toán thành công, đơn ở trạng thái “Đã thanh toán”, khách thấy xác nhận |
 | **Hậu điều kiện (thất bại)** | Không trừ tiền; tồn kho không bị trừ sai; khách được thông báo lỗi |
-| **Liên kết yêu cầu** | FR-06, FR-07, FR-30–FR-38; NFR-01–NFR-07 (theo phạm vi áp dụng trong [SRS tổng quát](./srs.md)) |
+| **Liên kết yêu cầu** | FR-06, FR-07, FR-25–FR-34; NFR-01–NFR-07 (theo phạm vi áp dụng trong [SRS tổng quát](./srs.md)) |
 
 
 1. Khách mở giỏ hàng và bấm “Đặt hàng”.
@@ -31,6 +31,6 @@ Bảng đặc tả Use Case
 
 * **E1:** Chưa đăng nhập/token hết hạn (bước 2) → chuyển sang trang đăng nhập, giữ giỏ hàng.
 * **E2:** Hết hàng (bước 3 hoặc 5) → báo món nào hết, không tạo đơn, cho khách chỉnh giỏ.
-* **E3:** Thanh toán thất bại (bước 7) → đơn chuyển “Thanh toán thất bại”, hoàn lại tồn kho, cho thử lại.
+* **E3:** Thanh toán thất bại (bước 7) → hệ thống chuyển đơn sang PAYMENT_FAILED, hoàn lại tồn kho đúng một lần và thông báo lỗi. Giỏ hàng được giữ nguyên để khách có thể tạo đơn mới và thanh toán lại; không cho thanh toán lại trên đơn đã PAYMENT_FAILED
 * **E4:** Khách gửi lại yêu cầu thanh toán (bấm 2 lần/mạng chập chờn) → hệ thống dùng idempotency key, trả kết quả cũ, không trừ tiền lần hai.
 * **E5:** Payment Service timeout → đơn ở trạng thái chờ, kiểm tra lại trạng thái giao dịch.
