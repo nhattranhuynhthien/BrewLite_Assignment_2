@@ -9,7 +9,7 @@ Bảng đặc tả Use Case
 | **Tiền điều kiện** | Đã đăng nhập; giỏ hàng có ít nhất 1 món |
 | **Hậu điều kiện (thành công)** | Đơn được tạo, tồn kho đã trừ, thanh toán thành công, đơn ở trạng thái “Đã thanh toán”, khách thấy xác nhận |
 | **Hậu điều kiện (thất bại)** | Không trừ tiền; tồn kho không bị trừ sai; khách được thông báo lỗi |
-| **Liên kết yêu cầu** | FR-06, FR-07, FR-30–FR-38; NFR-01–NFR-07 (theo phạm vi áp dụng trong [SRS tổng quát](./srs.md)) |
+| **Liên kết yêu cầu** | FR-06, FR-07, FR-25–FR-33; NFR-01–NFR-07 (theo phạm vi áp dụng trong [SRS tổng quát](./srs.md)) |
 
 
 1. Khách mở giỏ hàng và bấm “Đặt hàng”.
