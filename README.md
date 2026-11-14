@@ -114,7 +114,7 @@ CONTRIBUTING.md # Quy ước branch, commit, pull request và Definition of Done
 - [Use-case tổng quát (PlantUML)](docs/diagrams/use-case-overview.puml) · [SVG](docs/diagrams/use-case-overview.svg)
 - [SRS: Menu và sản phẩm](docs/requirements/srs-menu-product.md)
 - [ADR 003: ORM, schema và migration](docs/architecture/adr/003-orm-schema-catalog.md)
-- [Sơ đồ domain](docs/diagrams/class-domain.svg)
+- [Sơ đồ domain (PUML)](docs/diagrams/class-domain.puml) · [SVG](docs/diagrams/class-domain.svg) · [PNG](docs/diagrams/class-domain.png)
 - [Quy ước đóng góp và Definition of Done](CONTRIBUTING.md)
 
 ## Đóng góp
