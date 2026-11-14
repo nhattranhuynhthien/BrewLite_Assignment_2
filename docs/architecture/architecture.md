@@ -157,7 +157,7 @@ Chi tiết: ADR-004, ADR-005 và sequence diagram [sequence-checkout.puml](../di
 |---|---|
 | 001 | Dùng monorepo và đóng gói Docker (`001-monorepo.md`) |
 | 002 | Backend NestJS dạng modular monolith |
-| 003 | PostgreSQL + Prisma (`003-postgresql-prisma.md`) |
+| 003 | Prisma, schema catalog và migration PostgreSQL (`003-orm-schema-catalog.md`) |
 | 004 | Transaction khi tạo đơn và trừ tồn kho |
 | 005 | Idempotency cho thanh toán |
 | 006 | Dịch vụ thanh toán mô phỏng qua interface |
