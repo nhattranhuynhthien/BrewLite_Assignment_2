@@ -1,4 +1,5 @@
-@startuml
+@startuml activity
+title Activity-01 - Luồng đặt và xử lý đơn hàng end-to-end (BrewLite)
 skinparam DefaultTextAlignment center
 skinparam ActivityBackgroundColor #3498DB
 skinparam ActivityBorderColor #2980B9
@@ -33,7 +34,7 @@ else (Đã đăng nhập)
 endif
 
 |Hệ thống|
-:Tạo đơn hàng (PENDING_PAYMENT), tính lại giá, lưu snapshot và trừ tồn kho sản phẩm trong Transaction (FR-25, FR-26);
+:Tạo đơn hàng (PENDING_PAYMENT), tính lại giá, lưu snapshot và trừ tồn kho sản phẩm trong Transaction (FR-25, FR-26, FR-27);
 
 if (Đủ tồn kho / Thành công?) then (Hết hàng / Lỗi)
     :Rollback transaction, trả lỗi 409 Out of Stock;
@@ -48,7 +49,19 @@ else (Đủ hàng)
     |Hệ thống|
     :Kiểm tra kết quả cổng thanh toán (FR-30, FR-31);
     
-    if (Kết quả thanh toán?) then (Thành công - SUCCESS)
+    if (Kết quả thanh toán?) then (Thất bại - FAILED)
+        :Cập nhật trạng thái đơn thành PAYMENT_FAILED (FR-30);
+        :Hoàn lại tồn kho đã trừ đúng một lần (FR-30);
+        :Thông báo thanh toán thất bại (FR-33);
+        :Yêu cầu khách hàng tạo đơn mới từ giỏ hàng nếu muốn thử lại;
+        stop
+
+    elseif (Timeout / Chưa rõ kết quả) then (Chờ đối soát)
+        :Payment giữ PENDING, đơn giữ PENDING_PAYMENT (FR-31);
+        :Tiến hành đối soát trạng thái theo Idempotency-Key cũ (FR-31);
+        stop
+
+    else (Thành công - SUCCESS)
         :Cập nhật trạng thái đơn thành PAID (FR-30);
         :Thông báo thanh toán thành công (FR-33);
         
@@ -58,20 +71,6 @@ else (Đủ hàng)
         |Khách hàng|
         :Xem lịch sử và theo dõi trạng thái đơn (FR-35, FR-36);
         :Nhận đồ uống tại quầy;
-        stop
-        
-    elseif (Thất bại - FAILED) then (Từ chối / Lỗi)
-        |Hệ thống|
-        :Cập nhật trạng thái đơn thành PAYMENT_FAILED (FR-30);
-        :Hoàn lại tồn kho đã trừ đúng một lần (FR-30);
-        :Thông báo thanh toán thất bại (FR-33);
-        :Yêu cầu khách hàng tạo đơn mới từ giỏ hàng nếu muốn thử lại;
-        stop
-        
-    else (Timeout / Chưa rõ kết quả)
-        |Hệ thống|
-        :Payment giữ PENDING, đơn giữ PENDING_PAYMENT (FR-31);
-        :Tiến hành đối soát trạng thái theo Idempotency-Key cũ (FR-31);
         stop
     endif
 endif

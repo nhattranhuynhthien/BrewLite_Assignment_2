@@ -1,4 +1,5 @@
 @startuml sequence-checkout
+title Sequence-01 - Đặt và thanh toán đơn hàng (UC-01)
 actor Customer
 participant "Next.js UI" as UI
 participant "NestJS API" as API
@@ -7,44 +8,53 @@ participant "Payment Service" as PAY
 
 Customer -> UI: Bấm "Đặt hàng"
 UI -> API: POST /orders (Bearer JWT, items)
-API -> API: Verify JWT
-alt JWT không hợp lệ
+API -> API: Verify JWT (FR-22)
+alt JWT không hợp lệ (E1)
   API --> UI: 401 Unauthorized
-  UI --> Customer: Chuyển trang đăng nhập
+  UI --> Customer: Chuyển trang đăng nhập (giữ giỏ hàng - FR-14)
 else JWT hợp lệ
-  API -> API: Validate DTO
-  group Transaction
+  API -> API: Validate DTO & tính giá server (FR-06, FR-26)
+  group Transaction [FR-25, FR-26, FR-27]
     API -> DB: BEGIN
-    API -> DB: Kiểm tra tồn kho
-    alt Hết hàng
+    API -> DB: Kiểm tra và trừ tồn kho (stock_quantity >= qty)
+    alt Hết hàng (E2)
       API -> DB: ROLLBACK
-      API --> UI: 409 Out of stock
-      UI --> Customer: Báo món hết hàng
     else Đủ hàng
-      API -> DB: INSERT order, order_items
-      API -> DB: UPDATE stock (trừ kho)
+      API -> DB: INSERT order (PENDING_PAYMENT), order_items (snapshot)
       API -> DB: COMMIT
     end
   end
-  API --> UI: 201 {orderId, status: PENDING_PAYMENT}
+  alt Hết hàng (E2)
+    API --> UI: 409 Out of stock
+    UI --> Customer: Báo món hết hàng, giữ giỏ để chỉnh sửa
+  else Đủ hàng
+    API --> UI: 201 Created {orderId, status: PENDING_PAYMENT}
 
-  UI -> API: POST /payments (orderId, method)\nIdempotency-Key: K
-  API -> DB: Tìm payment theo key K
-  alt Key đã tồn tại
-    API --> UI: Trả kết quả cũ
-  else Key mới
-    API -> PAY: charge(amount, key K)
-    alt Thành công
-      PAY --> API: SUCCESS
-      API -> DB: UPDATE order = PAID, insert payment
-      API --> UI: 200 PAID
-      UI --> Customer: Hiển thị xác nhận đơn
-    else Thất bại
-      PAY --> API: FAILED
-      API -> DB: UPDATE order = PAYMENT_FAILED, hoàn kho
-      API --> UI: 402 Payment failed
-      UI --> Customer: Báo lỗi, cho thử lại
-    end
+    Customer -> UI: Chọn phương thức Ví/Thẻ & xác nhận
+    UI -> API: POST /payments (orderId, method)\nIdempotency-Key: K (FR-28, FR-29)
+      API -> DB: Kiểm tra chủ đơn (FR-23) & tìm key K
+      alt Key K đã tồn tại (E4)
+        API --> UI: Trả kết quả đã lưu (hoặc 409/422), không trừ tiền lần hai
+      else Key K mới
+        API -> DB: INSERT idempotency_key (IN_PROGRESS) & payment (PENDING)
+        API -> PAY: charge(orderId, amount, key K)
+        alt Thành công (FR-30)
+          PAY --> API: SUCCESS
+          API -> DB: UPDATE payment = SUCCESS, order = PAID, key = COMPLETED
+          API --> UI: 200 OK {status: PAID}
+          UI --> Customer: Hiển thị xác nhận đơn (FR-33)
+        else Thất bại (E3 - FR-30)
+          PAY --> API: FAILED
+          API -> DB: UPDATE payment = FAILED, order = PAYMENT_FAILED, hoàn kho 1 lần
+          API --> UI: 402 Payment failed {status: PAYMENT_FAILED}
+          UI --> Customer: Báo lỗi; tạo đơn mới + key mới nếu thử lại (FR-33)
+        else Timeout (E5 - FR-31)
+          PAY --> API: Timeout
+          API --> UI: 202 Accepted {status: PENDING_PAYMENT}
+          UI --> Customer: Hiển thị đang chờ đối soát kết quả (FR-31)
+          API -> PAY: Đối soát getStatus(key K) -> chốt PAID hoặc PAYMENT_FAILED
+        end
+      end
   end
 end
 @enduml
