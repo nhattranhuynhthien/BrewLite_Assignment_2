@@ -1,0 +1,760 @@
+openapi: 3.0.3
+info:
+  title: BrewLite Coffee Ordering API
+  version: 1.0.0
+  description: |
+    Canonical REST API contract for BrewLite MVP (NestJS + Prisma + PostgreSQL).
+    Client cart state is stored locally in `localStorage` under key `brewlite_cart`.
+servers:
+  - url: http://localhost:4000
+    description: Local development / Docker Compose API
+  - url: https://brewlite-api.onrender.com
+    description: Production Render API (example placeholder)
+tags:
+  - name: Health
+    description: Liveness and database readiness checks
+  - name: Auth
+    description: Registration and HS256 JWT login
+  - name: Catalog
+    description: Drink categories, paginated catalog, sizes, and toppings
+  - name: Orders
+    description: Order placement, history, detail, and staff status progression
+  - name: Payments
+    description: Idempotent mock payment processing and reconciliation
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "HS256 JWT containing `{ sub: userId, role: CUSTOMER | STAFF }`."
+  schemas:
+    UserRole:
+      type: string
+      enum: [CUSTOMER, STAFF]
+    OrderStatus:
+      type: string
+      enum:
+        - PENDING_PAYMENT
+        - PAYMENT_FAILED
+        - PAID
+        - PREPARING
+        - READY
+        - COMPLETED
+        - CANCELLED
+    PaymentMethod:
+      type: string
+      enum: [WALLET, CARD]
+    PaymentStatus:
+      type: string
+      enum: [PENDING, SUCCESS, FAILED]
+    MockPaymentScenario:
+      type: string
+      enum: [SUCCESS, DECLINED, TIMEOUT_CHARGED, TIMEOUT_NOT_CHARGED]
+    ErrorResponse:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        code:
+          type: string
+          example: OUT_OF_STOCK
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        error:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+          example: customer@brewlite.local
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: Minimum 8 characters, at least 1 letter and 1 digit.
+          example: BrewLite123
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: Nguyễn Minh Anh
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+    UserSummary:
+      type: object
+      required: [id, email, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+    AuthResponse:
+      type: object
+      required: [accessToken, user]
+      properties:
+        accessToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserSummary'
+    Category:
+      type: object
+      required: [id, name, displayOrder]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayOrder:
+          type: integer
+    Size:
+      type: object
+      required: [id, name, extraPrice]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: M
+        extraPrice:
+          type: integer
+          minimum: 0
+          description: Integer VND
+          example: 5000
+    Topping:
+      type: object
+      required: [id, name, extraPrice]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Trân châu trắng
+        extraPrice:
+          type: integer
+          minimum: 0
+          example: 6000
+    ProductSummary:
+      type: object
+      required: [id, categoryId, name, description, basePrice, stockQuantity, isAvailable]
+      properties:
+        id:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        basePrice:
+          type: integer
+          minimum: 0
+          example: 30000
+        stockQuantity:
+          type: integer
+          minimum: 0
+        isAvailable:
+          type: boolean
+        category:
+          $ref: '#/components/schemas/Category'
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductSummary'
+        - type: object
+          properties:
+            sizes:
+              type: array
+              items:
+                $ref: '#/components/schemas/Size'
+            toppings:
+              type: array
+              items:
+                $ref: '#/components/schemas/Topping'
+    PaginatedProducts:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+          example: 20
+    CreateOrderItemRequest:
+      type: object
+      required: [productId, sizeId, toppingIds, quantity]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        sizeId:
+          type: string
+          format: uuid
+        toppingIds:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 50
+    CreateOrderRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/CreateOrderItemRequest'
+        note:
+          type: string
+          maxLength: 500
+    OrderItemTopping:
+      type: object
+      required: [id, toppingId, toppingName, extraPrice]
+      properties:
+        id:
+          type: string
+          format: uuid
+        toppingId:
+          type: string
+          format: uuid
+        toppingName:
+          type: string
+        extraPrice:
+          type: integer
+    OrderItem:
+      type: object
+      required: [id, productId, sizeId, productName, sizeName, unitPrice, quantity, lineTotal]
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        sizeId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        sizeName:
+          type: string
+        unitPrice:
+          type: integer
+        quantity:
+          type: integer
+        lineTotal:
+          type: integer
+        toppings:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemTopping'
+    PaymentSummary:
+      type: object
+      required: [id, orderId, method, status, amount, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        amount:
+          type: integer
+        gatewayTransactionId:
+          type: string
+          nullable: true
+        failureReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    Order:
+      type: object
+      required: [id, userId, status, subtotal, discountAmount, totalAmount, createdAt, updatedAt, items]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        subtotal:
+          type: integer
+        discountAmount:
+          type: integer
+        totalAmount:
+          type: integer
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentSummary'
+    PaginatedOrders:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+    UpdateOrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [PREPARING, READY, COMPLETED]
+          description: Valid linear progression `PAID -> PREPARING -> READY -> COMPLETED`.
+        expectedStatus:
+          $ref: '#/components/schemas/OrderStatus'
+          description: Optional optimistic lock check; returns 409 if stale.
+    CreatePaymentRequest:
+      type: object
+      required: [orderId, method]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        scenario:
+          $ref: '#/components/schemas/MockPaymentScenario'
+          default: SUCCESS
+    PaymentResult:
+      type: object
+      required: [orderId, status]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [SUCCESS, FAILED, PENDING]
+        gatewayTransactionId:
+          type: string
+        reason:
+          type: string
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Readiness check including PostgreSQL connectivity
+      responses:
+        '200':
+          description: Service and database are ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  database:
+                    type: string
+                    example: up
+                  service:
+                    type: string
+                    example: brewlite-api
+                  timestamp:
+                    type: string
+                    format: date-time
+        '503':
+          description: Database unreachable
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Process liveness check
+      responses:
+        '200':
+          description: API process is running
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new CUSTOMER account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and receive HS256 JWT access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /categories:
+    get:
+      tags: [Catalog]
+      summary: List drink categories ordered by displayOrder
+      responses:
+        '200':
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+  /products:
+    get:
+      tags: [Catalog]
+      summary: Search and filter available drinks (20 per page)
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Case- and accent-insensitive name filter
+      responses:
+        '200':
+          description: Paginated available products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProducts'
+        '400':
+          description: Invalid pagination query
+  /products/{id}:
+    get:
+      tags: [Catalog]
+      summary: Get available product detail including sizes and toppings
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        '404':
+          description: Product not found or unavailable
+  /orders:
+    post:
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      summary: Create a PENDING_PAYMENT order with atomic stock reservation and server-side VND pricing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created in PENDING_PAYMENT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid items, size, topping, or quantity
+        '401':
+          description: Missing or invalid JWT
+        '404':
+          description: Referenced product unavailable
+        '409':
+          description: Insufficient stock (`OUT_OF_STOCK`)
+    get:
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      summary: List authenticated customer's own orders (20 per page, newest first)
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Paginated user orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrders'
+        '401':
+          description: Unauthorized
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      summary: Get order details owned by the authenticated user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Order belongs to another user
+        '404':
+          description: Order not found
+  /orders/{id}/status:
+    patch:
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      summary: Staff updates post-payment fulfillment status (`PAID -> PREPARING -> READY -> COMPLETED`)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid transition or unpaid/final order state
+        '401':
+          description: Unauthorized
+        '403':
+          description: STAFF role required
+        '404':
+          description: Order not found
+        '409':
+          description: Concurrent state conflict or stale expectedStatus
+  /staff/orders:
+    get:
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      summary: Staff lists active post-payment orders (`PAID`, `PREPARING`, `READY`)
+      responses:
+        '200':
+          description: Active fulfillment queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '403':
+          description: STAFF role required
+  /payments:
+    post:
+      tags: [Payments]
+      security:
+        - BearerAuth: []
+      summary: Process idempotent mock payment for a PENDING_PAYMENT order
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Required UUID v4 idempotency key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '200':
+          description: Payment succeeded (`Order -> PAID`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        '202':
+          description: Gateway timed out (`Payment = PENDING`, reconcile via `GET /payments/{orderId}/status`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        '400':
+          description: Missing or invalid UUID v4 `Idempotency-Key` header
+        '401':
+          description: Unauthorized
+        '402':
+          description: Payment declined (`Order -> PAYMENT_FAILED`, stock restored atomically)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        '403':
+          description: Order belongs to another user
+        '404':
+          description: Order not found
+        '409':
+          description: Idempotency request `IN_PROGRESS` or order already has active/final payment
+        '422':
+          description: Reused `Idempotency-Key` with different payload
+  /payments/{orderId}/status:
+    get:
+      tags: [Payments]
+      security:
+        - BearerAuth: []
+      summary: Reconcile or query current payment status for an owned order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Final or non-pending status
+        '202':
+          description: Still pending gateway confirmation
+        '401':
+          description: Unauthorized
+        '403':
+          description: Order belongs to another user
+        '404':
+          description: Order not found
