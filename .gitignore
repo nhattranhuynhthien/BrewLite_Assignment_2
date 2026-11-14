@@ -52,3 +52,15 @@ Thumbs.db
 
 # Personal / Local docs (Không track lên git)
 mydocs/
+
+# ========================================
+# AI Agent - Local Files
+# ========================================
+/agent.md
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/README_AGENT_SETUP.md
+/HUONG_DAN_THANH_VIEN_BREWLITE.md
+/.ai/
+/BrewLite_Agent_Kit_*.zip
