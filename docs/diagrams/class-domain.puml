@@ -1,5 +1,5 @@
 @startuml class-domain
-title Class-01 – Domain class diagram (BrewLite)
+title Class-01 - Domain class diagram (BrewLite)
 hide empty methods
 skinparam classAttributeIconSize 0
 skinparam linetype ortho
@@ -7,115 +7,146 @@ skinparam shadowing false
 
 class User {
   - id: UUID
-  - email: string «unique»
+  - email: string {unique}
   - passwordHash: string
   - fullName: string
   - phone: string [0..1]
   - role: UserRole
   - createdAt: timestamp
 }
+
 class Category {
   - id: UUID
-  - name: string «unique»
+  - name: string {unique}
   - displayOrder: int
 }
+
 class Product {
   - id: UUID
+  - categoryId: UUID
   - name: string
   - description: string
   - basePrice: int (VND)
   - imageUrl: string [0..1]
-  - stockQuantity: int ≥ 0
+  - stockQuantity: int >= 0
   - isAvailable: boolean
   - createdAt: timestamp
   - updatedAt: timestamp
 }
+
 class Size {
   - id: UUID
+  - productId: UUID
   - name: string (S/M/L)
-  - extraPrice: int (VND)
-}
-class Topping {
-  - id: UUID
-  - name: string «unique»
   - extraPrice: int (VND)
   - isAvailable: boolean
 }
+
+class Topping {
+  - id: UUID
+  - name: string {unique}
+  - extraPrice: int (VND)
+  - isAvailable: boolean
+}
+
 class Order {
   - id: UUID
+  - userId: UUID
+  - promotionId: UUID [0..1]
   - status: OrderStatus
-  - subtotal: int (VND)
+  - subtotalAmount: int (VND)
   - discountAmount: int (VND)
   - totalAmount: int (VND)
   - note: string [0..1]
   - createdAt: timestamp
   - updatedAt: timestamp
 }
+
 class OrderItem {
   - id: UUID
-  - productName: string «snapshot»
-  - sizeName: string «snapshot»
-  - unitPrice: int «snapshot»
-  - quantity: int ≥ 1
+  - orderId: UUID
+  - productId: UUID
+  - sizeId: UUID
+  - productName: string {snapshot}
+  - sizeName: string {snapshot}
+  - unitPrice: int (VND) {snapshot}
+  - quantity: int >= 1
   - lineTotal: int (VND)
 }
+
 class OrderItemTopping {
   - id: UUID
-  - toppingName: string «snapshot»
-  - extraPrice: int «snapshot»
+  - orderItemId: UUID
+  - toppingId: UUID
+  - toppingName: string {snapshot}
+  - extraPrice: int (VND) {snapshot}
 }
+
 class Payment {
   - id: UUID
+  - orderId: UUID
   - method: PaymentMethod
   - status: PaymentStatus
   - amount: int (VND)
-  - idempotencyKey: string «unique»
+  - idempotencyKey: string {unique}
   - providerRef: string [0..1]
   - failureReason: string [0..1]
   - createdAt: timestamp
+  - updatedAt: timestamp
 }
+
 class Promotion {
   - id: UUID
-  - code: string «unique»
+  - code: string {unique}
   - discountType: DiscountType
   - discountValue: int
-  - minOrderAmount: int
+  - minOrderAmount: int (VND)
   - startsAt: timestamp
   - endsAt: timestamp
   - usageLimit: int [0..1]
   - isActive: boolean
 }
+
 class LoyaltyTransaction {
   - id: UUID
+  - userId: UUID
+  - orderId: UUID [0..1]
   - type: LoyaltyType
   - points: int
   - createdAt: timestamp
 }
+
 enum UserRole {
   CUSTOMER
   STAFF
 }
+
 enum OrderStatus {
   PENDING_PAYMENT
+  PAYMENT_FAILED
   PAID
   PREPARING
   READY
   COMPLETED
   CANCELLED
 }
+
 enum PaymentMethod {
   WALLET
   CARD
 }
+
 enum PaymentStatus {
   PENDING
-  SUCCEEDED
+  SUCCESS
   FAILED
 }
+
 enum DiscountType {
   PERCENT
   FIXED_AMOUNT
 }
+
 enum LoyaltyType {
   EARN
   REDEEM
@@ -125,9 +156,9 @@ User "1" -- "0..*" Order : places
 Order "1" *-- "1..*" OrderItem : contains
 OrderItem "1" *-- "0..*" OrderItemTopping : has
 OrderItemTopping "0..*" --> "1" Topping : refers to
-OrderItem "0..*" --> "1" Product : refers to
+OrderItem "0..*" --> "1" Product : product snapshot
 OrderItem "0..*" --> "1" Size : chosen size
-Order "1" -- "0..*" Payment : paid by
+Order "1" -- "0..*" Payment : payment attempts
 Promotion "0..1" -- "0..*" Order : applied to
 User "1" -- "0..*" LoyaltyTransaction : owns
 Order "0..1" -- "0..*" LoyaltyTransaction : generates
@@ -142,5 +173,17 @@ Payment ..> PaymentStatus
 Promotion ..> DiscountType
 LoyaltyTransaction ..> LoyaltyType
 
-' «snapshot» = sao chép tên/giá tại thời điểm đặt để đơn cũ không đổi khi menu thay đổi
+note right of Order
+  Timeout remains PENDING_PAYMENT until reconciliation.
+  Expired pending orders may become CANCELLED.
+  Staff advances PAID to PREPARING, READY, COMPLETED.
+end note
+
+note bottom of Payment
+  At most one SUCCESS payment per order.
+end note
+
+note bottom of Promotion
+  Promotion and Loyalty are Could scope (FR-34).
+end note
 @enduml
