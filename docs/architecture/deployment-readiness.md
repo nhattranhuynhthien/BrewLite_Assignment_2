@@ -55,7 +55,7 @@ Cổng `3000` / `4000` / `5432` là cấu hình local dự kiến từ `.env.exa
 |---|---|---|---|
 | Thiết bị PWA & Next.js Web | [Kiến trúc](../architecture.md), `apps/web` | `origin/main@ad3e7a2` mới chỉ có `.gitkeep` | Source `apps/web`, `Dockerfile`, build-time `NEXT_PUBLIC_API_URL`, URL HTTPS |
 | NestJS API container | `apps/api` | Mã API nằm trên `origin/tai@15cb1f8`, chưa vào `main` | `Dockerfile`, đọc `$PORT`, validate env, private networking, URL API |
-| PostgreSQL persistent | `apps/api/prisma/`, `docker-compose.yml` | Schema/migration và Compose riêng service `db` ở `tai` | Chốt ORM giữa TV3/TV4; bật persistent storage, tắt external access |
+| PostgreSQL persistent | `apps/api/prisma/`, `docker-compose.yml` | Schema/migration Prisma và Compose riêng service `db` ở `tai` | TV3 đánh dấu `Superseded` cho `003-orm-schema-catalog.md`; bật persistent storage, tắt external access |
 | Registry & CI/CD | `.github/workflows` | `main` mới chỉ có `.gitkeep`; `0` workflow runs | Workflow CI/CD, quyết định registry, image tag theo SHA, log chạy thật |
 | Cấu hình & secrets | `.env.example`, Render env vars | Có `.env.example` mẫu | Biến môi trường đầy đủ, không đưa secret thật vào Git hoặc log |
 | Health & Logging | `I-33` (TV2) & [SRS tổng quát](../requirements/srs.md) | Có thiết kế `GET /health` ở `NFR-16`, logging `NFR-07` và `ADR-008` | Endpoint trả `200`/`503`, log JSON có redact, chốt thống nhất `/health/live` |
@@ -65,7 +65,7 @@ Cổng `3000` / `4000` / `5432` là cấu hình local dự kiến từ `.env.exa
 
 - **D-13 / D-14 (`I-08a`): LÀM CÓ ĐIỀU KIỆN.** Đã dọn mâu thuẫn hai bản kiến trúc và đồng bộ hiện trạng `main@ad3e7a2`, chờ TV2 review.
 - **D-20 (`I-08b`): LÀM CÓ ĐIỀU KIỆN cho bản thiết kế; BỊ CHẶN THỰC CHẤT khi nghiệm thu thật.** Đã chọn Render và xuất đủ `.puml` / `.svg` / `.png` gắn nhãn `DRAFT - NOT DEPLOYED`; không tự đánh dấu Done khi chưa có dịch vụ/URL thật.
-- **I-14 / I-15 / I-28 (Sprint 1 & đầu Sprint 2 DevOps): TẠM CHẶN ĐỂ TRÁNH XUNG ĐỘT.** Chưa tạo `Dockerfile`/`ci.yml`/`docker-compose.yml` trên `main` vì `apps/web` chưa có, `origin/tai:apps/api` chưa hợp nhất vào `main` (và thiếu script `lint`), đồng thời `ADR-003` giữa TypeORM (TV3) và Prisma (TV4) chưa chốt.
+- **I-14 / I-15 / I-28 (Sprint 1 & đầu Sprint 2 DevOps): ĐÃ MỞ NÚT ORM (`Prisma`), CÒN CHỜ HỢP NHẤT CODE NỀN.** Đã chốt dùng Prisma; vẫn chưa tạo `Dockerfile`/`ci.yml`/`docker-compose.yml` chính thức trên `main` vì `apps/web` chưa có và `origin/tai:apps/api` chưa hợp nhất vào `main` (còn thiếu script `lint`, fallback `PORT`).
 - **I-29 / I-30 / I-31 (Production & CD): BỊ CHẶN THỰC CHẤT.** Chưa tạo tài khoản, dịch vụ, database, secret hay deploy trong lượt này.
 
 ## Ràng buộc kỹ thuật Render đã đối chiếu tài liệu chính thức

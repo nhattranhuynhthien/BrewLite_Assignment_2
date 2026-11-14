@@ -16,7 +16,7 @@ Chọn **monorepo** với cấu trúc `apps/web`, `apps/api`, `docs`, `tests`, `
 
 Về đóng gói và vận hành (**D-14**, căn cứ `NFR-14`, `NFR-15`, `NFR-17`, `NFR-18`):
 - Đóng gói `apps/web` và `apps/api` bằng `Dockerfile` riêng (multi-stage build để giữ image gọn); dùng `docker-compose.yml` ở root để chạy đủ 3 service `web`, `api`, `db` khi phát triển và kiểm thử ở local.
-- PostgreSQL local dùng persistent volume; migration chạy có kiểm soát (`prisma migrate deploy` nếu nhóm chốt Prisma) trước khi phục vụ lưu lượng ở production, seed tài khoản demo chỉ chạy ở local/staging.
+- PostgreSQL local dùng persistent volume; migration chạy có kiểm soát (`prisma migrate deploy` vì nhóm đã chốt Prisma) trước khi phục vụ lưu lượng ở production, seed tài khoản demo chỉ chạy ở local/staging.
 - **Cấu hình và bảo mật container:** không nhúng secret vào image hoặc biến `NEXT_PUBLIC_*`. Khi chạy trên nền tảng **Render** (lựa chọn triển khai dự kiến ở D-20), ứng dụng web và API phải lắng nghe `0.0.0.0:$PORT`, còn `NEXT_PUBLIC_API_URL` cần được truyền đúng thời điểm build image web.
 - **CI/CD:** GitHub Actions chạy `Install → Lint → Unit Test → Build` cho cả `apps/web` và `apps/api` trên pull request; không cấu hình bộ lọc đường dẫn làm bỏ qua trạng thái kiểm tra bắt buộc khi merge vào `main`.
 - **Phạm vi quyết định:** ADR-001 chỉ quyết định cấu trúc monorepo và chiến lược đóng gói Docker. Quyết định ORM (`ADR-003`), xác thực (`ADR-007`), state frontend (`D-18`) và kiểm thử (`D-19`) thuộc owner tương ứng.
@@ -28,4 +28,4 @@ Về đóng gói và vận hành (**D-14**, căn cứ `NFR-14`, `NFR-15`, `NFR-1
 - (+) Tập trung một bộ pipeline CI/CD và một lịch sử Git chuẩn theo đề bài.
 - (+) Dễ dùng chung contract/DTO giữa frontend và backend.
 - (–) Cần quản lý tốt Docker context, khóa lockfile và cache để build trong CI không chậm.
-- (–) Chưa thể tạo workflow CI/Dockerfile chính thức trên `main` chừng nào chưa có `apps/web` và chưa chốt xung đột `ORM` (`TypeORM` vs `Prisma`) giữa TV3 và TV4.
+- (–) Chưa thể tạo workflow CI/Dockerfile chính thức trên `main` chừng nào chưa có `apps/web` và chưa hợp nhất khung `apps/api` (Prisma) từ nhánh làm việc vào `main`.

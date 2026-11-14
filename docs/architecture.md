@@ -6,7 +6,7 @@
 
 > **Lưu ý hiện trạng:** Đây là thiết kế đề xuất, không phải xác nhận hệ thống đã triển khai. Đối chiếu ngày `14/11/2026` trên `origin/main@ad3e7a2` (sau PR #54), `origin/Huy@bdf5891`, `origin/Nghia1@9f6cb4f` (PR #53) và `origin/tai@15cb1f8`: nhánh `main` chưa có ứng dụng thực thi (`apps/api`, `apps/web`, `.github/workflows` mới chỉ có `.gitkeep`); mã API/Prisma/Compose DB hiện nằm riêng trên `origin/tai`; chưa có code Next.js web, Dockerfile, CI/CD workflow hay URL production. PR #53 (chưa merge) đang xung đột với PR #54 vừa merge về bộ mã FR và các file SRS thành phần.
 
-Tài liệu này là đầu mối duy nhất cho mô tả kiến trúc **D-13**. [Đường dẫn kiến trúc cũ](architecture/architecture.md) trỏ về đây để tránh duy trì hai luồng mô tả payment khác nhau. Xung đột ORM (`TypeORM` vs `Prisma`) và đánh số ADR của các mảng khác vẫn chờ chủ sở hữu thống nhất, không được xem là đã giải quyết.
+Tài liệu này là đầu mối duy nhất cho mô tả kiến trúc **D-13**. [Đường dẫn kiến trúc cũ](architecture/architecture.md) trỏ về đây để tránh duy trì hai luồng mô tả payment khác nhau. Nhóm đã chốt dùng **Prisma** (`ADR-003: 003-postgresql-prisma.md`); việc đánh dấu `Superseded` cho bản đề xuất TypeORM (`003-orm-schema-catalog.md`) và thống nhất đánh số ADR các mảng khác thuộc chủ sở hữu tương ứng hoàn tất.
 
 ## 1. Mục tiêu và ràng buộc kiến trúc
 
@@ -52,7 +52,7 @@ Sơ đồ trên minh họa mức container; cổng, TLS termination, cơ chế m
 |---|---|---|---|
 | Web App | Next.js, PWA | Giao diện mobile-first, giỏ hàng phía client, gọi API, hiển thị loading/empty/error | `apps/web` |
 | API | NestJS | Nghiệp vụ, xác thực JWT, validate, transaction, idempotency, job nền, gateway thanh toán mô phỏng | `apps/api` |
-| Database | PostgreSQL | Lưu người dùng, menu, đơn hàng, thanh toán, idempotency key | `apps/api/prisma/` *(nếu chốt Prisma)* hoặc migrations |
+| Database | PostgreSQL | Lưu người dùng, menu, đơn hàng, thanh toán, idempotency key | `apps/api/prisma/` (Prisma schema & migrations) |
 
 ## 4. Kiến trúc backend (Modular Monolith)
 
@@ -61,7 +61,7 @@ Backend tổ chức dạng modular monolith trên NestJS, chia theo miền nghi�
 ```text
 apps/api/src/
   common/       # config validation, logger, guards, decorators, error filters
-  prisma/       # (hoặc database/) kết nối DB dùng chung
+  prisma/       # PrismaModule & PrismaService kết nối PostgreSQL dùng chung
   auth/         # TV2: đăng ký, đăng nhập, JWT, Users
   products/     # TV3: danh mục, sản phẩm, size, topping, tồn kho
   orders/       # TV4: tạo đơn (transaction), validate, lịch sử/chi tiết, cập nhật trạng thái
@@ -75,10 +75,10 @@ Mỗi module theo 3 lớp:
 |---|---|---|
 | Presentation | Controller, DTO (`class-validator`), Guards | Nhận HTTP request, validate input, kiểm tra JWT/role, map response/HTTP status |
 | Application / Domain | Service | Quy tắc nghiệp vụ: tính giá server, chuyển trạng thái, transaction, idempotency |
-| Infrastructure | Repository / `PrismaService`, Payment gateway adapter | Truy cập DB và hệ thống ngoài |
+| Infrastructure | `PrismaService` (PostgreSQL), Payment gateway adapter | Truy cập DB và hệ thống ngoài |
 
 **Quy tắc phụ thuộc:**
-- Trong module: `Controller → Service → Repository/PrismaService hoặc Adapter`.
+- Trong module: `Controller → Service → PrismaService hoặc Adapter`.
 - Giữa các module: chỉ gọi qua service được export, không truy cập bảng của nhau; hướng một chiều `payments → orders → products`, không phụ thuộc vòng. Các method tham gia giao dịch nhận context transaction (`tx`) để nhiều module chạy chung một transaction.
 - Mục tiêu kiểm soát tự động: dùng ESLint rule (`no-restricted-imports`) trong CI. Hiện tại `.github/workflows` chưa có workflow và `origin/tai:apps/api/package.json` chưa có script `lint`, nên chưa có bằng chứng kiểm tra tự động.
 - Job nền (hủy đơn quá hạn, đối soát payment treo) đặt trong module `payments`, chạy trong tiến trình API bằng `@nestjs/schedule`.
@@ -96,10 +96,10 @@ Mỗi module theo 3 lớp:
 
 ## 6. PostgreSQL và cơ chế migration
 
-- **Xung đột ORM đang chờ chốt:** Trên `main` tồn tại song song [ADR TypeORM (TV3 – Proposed)](architecture/adr/003-orm-schema-catalog.md) và [ADR Prisma (TV4 – Accepted)](architecture/adr/003-postgresql-prisma.md); nhánh `origin/tai@15cb1f8` đang dùng **Prisma** (`apps/api/prisma/schema.prisma`). Các mô tả Prisma dưới đây phản ánh giải pháp theo mã hiện có trên `origin/tai`, **không thay thế** quyết định chung mà TV3/TV4/TV1 cần chốt.
-- **Local:** `prisma migrate dev` tạo migration mới (nếu chốt Prisma). **Production/CI:** `prisma migrate deploy` chỉ áp dụng các migration đã commit (không dùng `migrate dev` hay `db push` ở production).
+- **Quyết định ORM đã chốt:** Nhóm đã chốt sử dụng **PostgreSQL + Prisma (`Prisma Migrate`)** theo [ADR-003 Prisma](architecture/adr/003-postgresql-prisma.md), khớp với cấu trúc `apps/api/prisma/schema.prisma` trên nhánh `origin/tai@15cb1f8`. Bản đề xuất TypeORM cũ ([003-orm-schema-catalog.md](architecture/adr/003-orm-schema-catalog.md)) trên `main` cần được **TV3** đánh dấu `Superseded` để xóa trùng mã ADR `003` (giữ lại các quy ước schema như tiền `integer` VND, `CHECK`, snapshot giá và seed idempotent).
+- **Local:** `prisma migrate dev` tạo migration mới. **Production/CI:** `prisma migrate deploy` chỉ áp dụng các migration đã commit (không dùng `migrate dev` hay `db push` ở production); Dockerfile/CI chạy `prisma generate` trước bước build.
 - **Migration khi deploy:** chạy như một bước kiểm soát riêng **trước khi chuyển lưu lượng** sang bản mới; thất bại thì pipeline dừng. Vì runner CI công khai không được kết nối trực tiếp vào DB private trên Render, cần dùng tác vụ chạy phía Render trong mạng nội bộ.
-- **Seed:** script seed phải idempotent (`prisma db seed` hoặc tương đương). Dữ liệu danh mục/món mẫu có thể chạy kiểm soát; tài khoản demo chỉ dành cho local/staging.
+- **Seed:** script seed phải idempotent (`prisma db seed`). Dữ liệu danh mục/món mẫu có thể chạy kiểm soát; tài khoản demo chỉ dành cho local/staging.
 - **Migration an toàn:** ưu tiên thay đổi tương thích ngược (expand → contract); rollback dùng migration sửa ngược hoặc khôi phục snapshot trước migration.
 - **Ràng buộc dữ liệu bắt buộc:** `CHECK (stock_quantity >= 0)`, giá và phụ thu nguyên VND `>= 0`, partial unique index `payments(order_id) WHERE status = 'SUCCESS'`, khóa duy nhất `(user_id, key)` cho idempotency, khóa ngoại rõ ràng.
 - **Storage:** PostgreSQL local dùng persistent volume trong `docker-compose.yml`; production dùng managed persistent storage và **tắt external/public access**.
@@ -147,7 +147,7 @@ Mỗi module theo 3 lớp:
 |---|---|---|
 | `001-monorepo.md` | Monorepo + Docker (TV1 – D-14) | Chờ TV2 review bản cập nhật mới |
 | `002-modular-monolith-nestjs.md` | Backend NestJS modular monolith | Đang trùng dải số với D-15 (phân công ghi `ADR 002: JWT và bảo mật`) |
-| `003-orm-schema-catalog.md` vs `003-postgresql-prisma.md` | TypeORM (TV3) vs Prisma (TV4) | **Mâu thuẫn trực tiếp — TV3/TV4/TV1 phải chốt 1 ORM duy nhất** |
+| `003-postgresql-prisma.md` vs `003-orm-schema-catalog.md` | Prisma (Accepted) vs TypeORM (Proposed) | **Nhóm đã chốt Prisma**; TV3 cần đánh dấu `003-orm-schema-catalog.md` là `Superseded` để hết trùng số `003` |
 | `004-transaction-order-inventory.md` | Transaction đơn hàng & tồn kho | Đủ nội dung nền; chờ khớp enum/sequence |
 | `005-idempotency-payment.md` | Idempotency thanh toán | Đang trùng số với D-18 (phân công ghi `ADR 005: Next.js PWA`) |
 | `006-mock-payment-gateway.md` | Mock Payment Gateway | Đang trùng số với D-19 (phân công ghi `ADR 006: Chiến lược kiểm thử`) |
@@ -173,4 +173,4 @@ Mỗi module theo 3 lớp:
 | `origin/Huy@bdf5891` (`activity-diagram.puml/.png/.svg`) | Đã có swimlane, kiểm tra tồn kho và nhánh đăng nhập | Chưa mở PR; nhánh dính gitlink rác `BrewLite_Assignment_2`, sửa file SRS đã bị xóa, Activity lặp vô tận khi thanh toán thất bại và thiếu bước giỏ hàng | TV5 dọn nhánh, chỉnh Activity theo SRS và mở PR để TV6 review |
 | `origin/main:docs/diagrams/sequence-checkout.puml/.svg` | Đủ 5 lifeline, JWT, transaction, idempotency | `.puml` lệch `.svg`; nhánh hết hàng không dừng mà vẫn chảy xuống HTTP `201` và thanh toán | TV4 sửa `.puml` và xuất lại `.svg`/`.png` gửi TV1 review |
 | `origin/main:docs/diagrams/class-domain.puml` | Đủ thực thể `User`, `Product`, `Order`, `Payment`, snapshot | Thiếu `PAYMENT_FAILED` trong `OrderStatus`, dùng `SUCCEEDED` thay cho `SUCCESS` ở `PaymentStatus` | TV3 đồng bộ enum khớp với SRS và schema trên `origin/tai` |
-| `origin/tai@15cb1f8` (`apps/api`, `docker-compose.yml`) | Có Prisma schema (`PAYMENT_FAILED`, `SUCCESS`), transaction và 7 e2e specs | Chưa vào `main`; thiếu script `lint`, thiếu `/health`, `main.ts` chỉ đọc `API_PORT` (chưa fallback `PORT` của Render), chưa có `apps/web` | TV4 & TV3 chốt ADR-003 trước; sau đó TV1 tích hợp Dockerfile, Compose 3 service và CI |
+| `origin/tai@15cb1f8` (`apps/api`, `docker-compose.yml`) | Có Prisma schema (`PAYMENT_FAILED`, `SUCCESS`), transaction và 7 e2e specs | Chưa vào `main`; thiếu script `lint`, thiếu `/health`, `main.ts` chỉ đọc `API_PORT` (chưa fallback `PORT` của Render), chưa có `apps/web` | Tách/hợp nhất khung API Prisma lên từ `main` và bổ sung `lint`/`/health`/`PORT`; sau đó TV1 tích hợp Dockerfile (`prisma generate`), Compose 3 service và CI |
