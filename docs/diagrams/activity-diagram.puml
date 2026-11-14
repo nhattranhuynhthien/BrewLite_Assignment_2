@@ -7,70 +7,68 @@ skinparam SwimlaneBorderColor #333333
 
 |Hệ thống|
 start
-:Mở menu nước;
+:Xem menu sản phẩm (FR-01);
+:Xem chi tiết sản phẩm, size, topping và tồn kho (FR-04, FR-05, FR-07);
 
 |Khách hàng|
-:Chọn món / Thêm vào giỏ;
+:Chọn số lượng, tùy chọn và thêm vào giỏ hàng (FR-10, FR-11);
+:Chỉnh sửa hoặc quản lý giỏ hàng tạm tính (FR-12, FR-13, FR-14);
+:Bấm nút đặt hàng / thanh toán;
 
 |Hệ thống|
-:Kiểm tra nguyên vật liệu (FR-07)[cite: 6];
-if (Đủ nguyên vật liệu?) then (Không)
-    :Thông báo hết đồ uống / Thiếu hàng;
-    stop
-else (Có)
-    :Hiển thị chi tiết sản phẩm, size, topping (FR-04, FR-05)[cite: 6];
-    :Kiểm tra trạng thái đăng nhập (FR-21)[cite: 6];
-    
-    if (Đã đăng nhập?) then (Chưa đăng nhập)
-        |Khách hàng|
-        :Hiển thị giao diện đăng nhập;
-        :Nhập tài khoản, mật khẩu;
-        
-        |Hệ thống|
-        :Kiểm tra thông tin xác thực JWT (FR-21, FR-22)[cite: 6];
-        if (Hợp lệ?) then (Sai)
-            :Thông báo đăng nhập thất bại;
-            stop
-        else (Đúng)
-        endif
-    else (Đã đăng nhập)
-    endif
+:Kiểm tra trạng thái đăng nhập và JWT hợp lệ (FR-22);
+
+if (Đã đăng nhập và JWT hợp lệ?) then (Chưa / Không hợp lệ)
+    |Khách hàng|
+    :Hiển thị giao diện đăng nhập;
+    :Nhập thông tin tài khoản, mật khẩu;
     
     |Hệ thống|
-    :Yêu cầu xác nhận thông tin đồ uống & tổng tiền tạm tính (FR-14)[cite: 6];
+    :Xác thực tài khoản, cấp mã JWT và giữ nguyên giỏ hàng (FR-14, FR-21);
+else (Đã đăng nhập)
+endif
+
+|Hệ thống|
+:Tạo đơn hàng (PENDING_PAYMENT), tính lại giá, lưu snapshot và trừ tồn kho sản phẩm trong Transaction (FR-25, FR-26);
+
+if (Đủ tồn kho / Thành công?) then (Hết hàng / Lỗi)
+    :Rollback transaction, trả lỗi 409 Out of Stock;
+    :Giữ nguyên giỏ hàng để khách điều chỉnh;
+    stop
+else (Đủ hàng)
+    :Hiển thị hóa đơn và giao diện thanh toán (FR-28, FR-33);
     
     |Khách hàng|
-    if (Lựa chọn?) then (Chọn Hủy)
-        |Hệ thống|
-        :Hủy thao tác / Giữ giỏ hàng ở client;
-        stop
-    else (Chọn Xác nhận / Đặt đơn)
-        |Hệ thống|
-        :Tạo đơn hàng (PENDING_PAYMENT), tạo dòng đơn & trừ tồn kho trong Transaction (FR-30, FR-32)[cite: 6];
-        :Hiển thị hóa đơn thanh toán (FR-33)[cite: 6];
+    :Thực hiện thanh toán Ví/Thẻ mô phỏng kèm Idempotency-Key (FR-28, FR-29);
+    
+    |Hệ thống|
+    :Kiểm tra kết quả cổng thanh toán (FR-30, FR-31);
+    
+    if (Kết quả thanh toán?) then (Thành công - SUCCESS)
+        :Cập nhật trạng thái đơn thành PAID (FR-30);
+        :Thông báo thanh toán thành công (FR-33);
+        
+        |Nhân viên quầy (STAFF)|
+        :Nhân viên nhận đơn, cập nhật PAID -> PREPARING -> READY -> COMPLETED (FR-24, FR-37, FR-38);
         
         |Khách hàng|
-        :Thực hiện thanh toán (Ví/Thẻ mô phỏng tự động) (FR-33)[cite: 6];
+        :Xem lịch sử và theo dõi trạng thái đơn (FR-35, FR-36);
+        :Nhận đồ uống tại quầy;
+        stop
         
-        |Hệ thống|
-        :Kiểm tra kết quả cổng thanh toán (FR-34, FR-35)[cite: 6];
+    elseif (Thất bại - FAILED) then (Từ chối / Lỗi)
+|Hệ thống|
+        :Cập nhật trạng thái đơn thành PAYMENT_FAILED (FR-30);
+        :Hoàn lại tồn kho đã trừ đúng một lần (FR-30);
+        :Thông báo thanh toán thất bại (FR-33);
+        :Yêu cầu khách hàng tạo đơn mới từ giỏ hàng nếu muốn thử lại;
+        stop
         
-        if (Thanh toán thành công?) then (Thành công)
-            :Cập nhật trạng thái đơn: PAID -> Tự động chuyển PREPARING (FR-35)[cite: 6];
-            :Thông báo thanh toán thành công & tiến hành pha chế tự động;
-            :Thông báo hoàn thành (READY) khi xong đồ;
-            
-            |Khách hàng|
-            :Nhận đồ uống tại quầy tự động;
-            stop
-        else (Thất bại / Lỗi)
-            |Hệ thống|
-            :Cập nhật trạng thái đơn: PAYMENT_FAILED (FR-35)[cite: 6];
-            :Hoàn lại tồn kho đã trừ đúng một lần (FR-35)[cite: 6];
-            :Thông báo thanh toán thất bại (FR-38)[cite: 6];
-            :Yêu cầu khách tạo đơn mới từ giỏ hàng;
-            stop
-        endif
+    else (Timeout / Chưa rõ kết quả)
+|Hệ thống|
+        :Payment giữ PENDING, đơn giữ PENDING_PAYMENT (FR-31);
+        :Tiến hành đối soát trạng thái theo Idempotency-Key cũ (FR-31);
+        stop
     endif
 endif
 @enduml
