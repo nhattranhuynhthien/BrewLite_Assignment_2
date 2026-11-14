@@ -135,7 +135,7 @@ Mỗi module theo 3 lớp:
 4. Cập nhật đơn và hoàn kho dùng cập nhật có điều kiện (`WHERE status = 'PENDING_PAYMENT'`, hoàn kho chỉ khi cập nhật ảnh hưởng đúng 1 dòng) để không hoàn kho hai lần. Job nền hủy đơn `PENDING_PAYMENT` quá hạn theo cùng quy tắc, chỉ hủy đơn không có payment `PENDING`/`SUCCESS` hoặc sau khi đối soát.
 5. Client theo dõi trạng thái qua `GET /orders/:id`.
 
-Chi tiết: ADR-004, ADR-005 và sequence diagram [sequence-checkout.puml](../diagrams/sequence-checkout.puml).
+Chi tiết: ADR-004 và sequence diagram [sequence-checkout.puml](../diagrams/sequence-checkout.puml).
 
 ## 10. Lý do chọn kiến trúc, ưu điểm, hạn chế, trade-off
 
