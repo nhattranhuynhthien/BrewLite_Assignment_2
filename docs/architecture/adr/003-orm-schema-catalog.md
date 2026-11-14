@@ -3,13 +3,13 @@
 - **Trạng thái:** Accepted
 - **Ngày quyết định:** 2026-11-08
 - **Cập nhật:** 2026-11-14 — hợp nhất quyết định Prisma và làm rõ phạm vi catalog
-- **Liên quan:** [SRS](../../requirements/srs.md) (FR-01–FR-08, FR-26–FR-27, NFR-06, NFR-15), [Class-01](../../diagrams/class-domain.puml), [kiến trúc hệ thống](../architecture.md), ADR-001, ADR-004, ADR-005
+- **Liên quan:** [SRS](../../requirements/srs.md) (FR-01–FR-08, FR-26–FR-27, NFR-06, NFR-15), [Class-01](../../diagrams/class-domain.puml), [kiến trúc hệ thống](../architecture.md), ADR-001, ADR-004
 
 ## Bối cảnh
 
 BrewLite dùng NestJS và PostgreSQL. Catalog gồm `Category`, `Product`, `Size` và `Topping`; hệ thống cần truy vấn menu/chi tiết sản phẩm (FR-01–FR-05), tính giá và kiểm tra tồn kho phía server (FR-06–FR-07), đồng thời tạo dữ liệu mẫu có thể tái lập và seed không sinh bản ghi trùng (FR-08). Đơn vị giá là VND nguyên, tồn kho không âm; tạo đơn và trừ kho phải nguyên tử (NFR-06, ADR-004).
 
-Các tài liệu kiến trúc và ADR-004/005 đã chọn Prisma, nhưng ADR-003 trước đây có hai bản với quyết định ORM mâu thuẫn. ADR này hợp nhất chúng thành một quyết định. Tại thời điểm cập nhật, `apps/api` chỉ có `.gitkeep`; đây là quyết định thiết kế, không khẳng định schema, migration hay seed đã được triển khai hoặc kiểm thử.
+Các tài liệu kiến trúc và ADR-004 đã chọn Prisma, nhưng ADR-003 trước đây có hai bản với quyết định ORM mâu thuẫn. ADR này hợp nhất chúng thành một quyết định. Tại thời điểm cập nhật, `apps/api` chỉ có `.gitkeep`; đây là quyết định thiết kế, không khẳng định schema, migration hay seed đã được triển khai hoặc kiểm thử.
 
 ## Các phương án
 
@@ -23,7 +23,7 @@ Chọn **PostgreSQL với Prisma Client và Prisma Migrate** cho catalog và cá
 
 - Khai báo mô hình tại `apps/api/prisma/schema.prisma`; NestJS dùng `PrismaService` trong `PrismaModule` dùng chung.
 - Mô hình catalog phải nhất quán với Class-01: danh mục có nhiều sản phẩm; sản phẩm có size; sản phẩm có thể dùng nhiều topping. Ẩn sản phẩm bằng trạng thái khả dụng; không thêm chức năng xóa catalog trong MVP (FR-09 là Won't).
-- Lưu giá cơ bản và phụ thu dưới dạng số nguyên VND. Bảo vệ tồn kho không âm bằng `CHECK` ở PostgreSQL; thêm ràng buộc không biểu diễn trực tiếp được trong Prisma bằng SQL trong migration. Các ràng buộc toàn vẹn đơn hàng/thanh toán được đặc tả thêm tại ADR-004 và ADR-005.
+- Lưu giá cơ bản và phụ thu dưới dạng số nguyên VND. Bảo vệ tồn kho không âm bằng `CHECK` ở PostgreSQL; thêm ràng buộc không biểu diễn trực tiếp được trong Prisma bằng SQL trong migration. Các ràng buộc toàn vẹn đơn hàng/thanh toán được đặc tả thêm tại ADR-004.
 - Lưu snapshot tên và giá trên các dòng đơn hàng khi đặt; không tính lại lịch sử từ giá catalog hiện tại (FR-26, ADR-004).
 - Commit schema và migration vào `apps/api/prisma/migrations`. Dùng `prisma migrate dev` để tạo và áp dụng migration trong local; CI/production chỉ áp dụng migration đã commit bằng `prisma migrate deploy`. Không dùng `db push` làm quy trình quản lý schema chung và không tự đồng bộ schema khi ứng dụng khởi động.
 - Sinh Prisma Client bằng `prisma generate` trong quy trình build. Seed catalog phải idempotent, dùng khóa tự nhiên phù hợp và upsert để đáp ứng FR-08. Seed dữ liệu mẫu chạy theo môi trường; production chỉ nạp dữ liệu tham chiếu có chủ đích, không nạp tài khoản demo.
