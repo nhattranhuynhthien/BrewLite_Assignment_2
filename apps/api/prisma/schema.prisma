@@ -33,6 +33,14 @@ enum PaymentStatus {
   FAILED
 }
 
+enum PaymentDispatchStatus {
+  PENDING_DISPATCH
+  DISPATCHING
+  AWAITING_GATEWAY
+  COMPLETED
+  NEEDS_INTERVENTION
+}
+
 enum IdempotencyStatus {
   IN_PROGRESS
   COMPLETED
@@ -176,18 +184,26 @@ model OrderItemTopping {
 }
 
 model Payment {
-  id                   String        @id @default(uuid()) @db.Uuid
-  orderId              String        @map("order_id") @db.Uuid
+  id                   String                @id @default(uuid()) @db.Uuid
+  orderId              String                @map("order_id") @db.Uuid
   method               PaymentMethod
-  status               PaymentStatus @default(PENDING)
+  status               PaymentStatus         @default(PENDING)
   amount               Int
-  idempotencyKey       String        @unique @map("idempotency_key")
-  gatewayTransactionId String?       @map("gateway_transaction_id")
-  failureReason        String?       @map("failure_reason")
-  createdAt            DateTime      @default(now()) @map("created_at")
-  order                Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  idempotencyKey       String                @unique @map("idempotency_key")
+  gatewayTransactionId String?               @map("gateway_transaction_id")
+  failureReason        String?               @map("failure_reason")
+  scenario             String                @default("SUCCESS")
+  dispatchStatus       PaymentDispatchStatus @default(PENDING_DISPATCH) @map("dispatch_status")
+  attemptCount         Int                   @default(0) @map("attempt_count")
+  dispatchLeaseUntil   DateTime?             @map("dispatch_lease_until")
+  nextRetryAt          DateTime?             @map("next_retry_at")
+  lastError            String?               @map("last_error")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at")
+  order                Order                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@index([orderId, createdAt])
+  @@index([status, dispatchStatus, nextRetryAt])
   @@map("payments")
 }
 

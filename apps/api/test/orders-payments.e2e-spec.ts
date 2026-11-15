@@ -1,21 +1,28 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import {
   DiscountType,
+  IdempotencyStatus,
+  LoyaltyType,
   OrderStatus,
+  PaymentDispatchStatus,
   PaymentMethod,
+  PaymentStatus,
   UserRole,
 } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
+import { createAppValidationPipe } from '../src/common/validation/app-validation.pipe';
+import { PaymentJobs } from '../src/payments/payment.jobs';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
+  let paymentJobs: PaymentJobs;
   let usedKeys: string[] = [];
   let usedPromoIds: string[] = [];
   let fixture: {
@@ -37,10 +44,11 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
       imports: [AppModule],
     }).compile();
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(createAppValidationPipe());
     await app.init();
     prisma = app.get(PrismaService);
     jwtService = app.get(JwtService);
+    paymentJobs = app.get(PaymentJobs);
   });
 
   beforeEach(async () => {
@@ -147,7 +155,6 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
           sizeId: fixture.sizeId,
           toppingIds: [fixture.toppingId],
           quantity,
-          unitPrice: 1, // forged client price must be stripped/ignored
         },
       ],
     };
@@ -566,5 +573,260 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
       where: { id: promo2.id },
     });
     expect(restoredPromo.usedCount).toBe(0);
+  });
+
+  it('TEST-01: rejects forged extra fields like unitPrice and userId with HTTP 400 while valid payload succeeds', async () => {
+    const valid = orderPayload(2);
+
+    await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send({
+        ...valid,
+        items: [{ ...valid.items[0], unitPrice: 1 }],
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send({
+        ...valid,
+        userId: fixture.otherUserId,
+      })
+      .expect(400);
+
+    const created = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send(valid)
+      .expect(201);
+
+    expect(created.body.userId).toBe(fixture.userId);
+    expect(created.body.totalAmount).toBeGreaterThan(1000);
+  });
+
+  it('BE-04: rejects passwords exceeding 72 UTF-8 bytes on register/login and distinguishes 72-byte boundary secrets', async () => {
+    const email = `utf8-${randomUUID()}@brewlite.local`;
+    const seventyTwoBytes = `A1${'\u00e9'.repeat(35)}`; // 37 chars, 72 UTF-8 bytes
+    const seventyThreeBytes = `${seventyTwoBytes}X`; // 38 chars, 73 UTF-8 bytes
+    const differentTailSamePrefix = `A1${'\u00e9'.repeat(34)}\u00e8`;
+
+    try {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email,
+          fullName: 'Unicode Boundary User',
+          password: seventyThreeBytes,
+        })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email,
+          password: seventyThreeBytes,
+        })
+        .expect(400);
+
+      const registered = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email,
+          fullName: 'Unicode Boundary User',
+          password: seventyTwoBytes,
+        })
+        .expect(201);
+      expect(registered.body.email).toBe(email);
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email,
+          password: seventyTwoBytes,
+        })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email,
+          password: differentTailSamePrefix,
+        })
+        .expect(401);
+    } finally {
+      await prisma.user.deleteMany({ where: { email } });
+    }
+  });
+
+  it('BE-01: serializes POST /payments against expireStaleOrders() so cancelled order never charges gateway', async () => {
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send(orderPayload(2))
+      .expect(201);
+    const orderId = orderRes.body.id as string;
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { createdAt: new Date(Date.now() - 20 * 60 * 1000) },
+    });
+
+    const key = randomUUID();
+    usedKeys.push(key);
+
+    const [payRes, cancelledCount] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/payments')
+        .set('Authorization', authHeader())
+        .set('Idempotency-Key', key)
+        .send({ orderId, method: PaymentMethod.WALLET }),
+      paymentJobs.expireStaleOrders(),
+    ]);
+
+    const finalOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
+    const gwTx = await prisma.mockGatewayTransaction.findUnique({
+      where: { idempotencyKey: key },
+    });
+
+    if (finalOrder.status === OrderStatus.CANCELLED) {
+      expect(payRes.status).toBe(409);
+      expect(gwTx).toBeNull();
+      expect(cancelledCount).toBeGreaterThanOrEqual(1);
+    } else {
+      expect(payRes.status).toBe(200);
+      expect(finalOrder.status).toBe(OrderStatus.PAID);
+      expect(gwTx).not.toBeNull();
+      expect(cancelledCount).toBe(0);
+    }
+  });
+
+  it('BE-02: recovers interrupted DISPATCHING payment with expired lease and replays same key without duplicate charge', async () => {
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send(orderPayload(1))
+      .expect(201);
+    const orderId = orderRes.body.id as string;
+    const key = randomUUID();
+    usedKeys.push(key);
+
+    const requestHash = createHash('sha256')
+      .update(JSON.stringify({ orderId, method: PaymentMethod.WALLET }))
+      .digest('hex');
+
+    await prisma.idempotencyKey.create({
+      data: {
+        userId: fixture.userId,
+        key,
+        endpoint: 'POST /payments',
+        requestHash,
+        status: IdempotencyStatus.IN_PROGRESS,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const payment = await prisma.payment.create({
+      data: {
+        orderId,
+        method: PaymentMethod.WALLET,
+        status: PaymentStatus.PENDING,
+        amount: orderRes.body.totalAmount as number,
+        idempotencyKey: key,
+        scenario: 'SUCCESS',
+        dispatchStatus: PaymentDispatchStatus.DISPATCHING,
+        attemptCount: 1,
+        dispatchLeaseUntil: new Date(Date.now() - 1000),
+      },
+    });
+
+    const recovered = await paymentJobs.recoverPendingPayments();
+    expect(recovered).toBeGreaterThanOrEqual(1);
+
+    const settledOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
+    const settledPayment = await prisma.payment.findUniqueOrThrow({
+      where: { id: payment.id },
+    });
+    expect(settledOrder.status).toBe(OrderStatus.PAID);
+    expect(settledPayment.status).toBe(PaymentStatus.SUCCESS);
+    expect(settledPayment.dispatchStatus).toBe(PaymentDispatchStatus.COMPLETED);
+
+    const replay = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', authHeader())
+      .set('Idempotency-Key', key)
+      .send({ orderId, method: PaymentMethod.WALLET })
+      .expect(200);
+    expect(replay.body.status).toBe('SUCCESS');
+
+    const gwTxCount = await prisma.mockGatewayTransaction.count({
+      where: { idempotencyKey: key },
+    });
+    expect(gwTxCount).toBe(1);
+  });
+
+  it('BE-03: concurrent GET /payments/:orderId/status returns [200, 200] with single loyalty earn and preserves PREPARING status', async () => {
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send(orderPayload(2))
+      .expect(201);
+    const orderId = orderRes.body.id as string;
+    const key = randomUUID();
+    usedKeys.push(key);
+
+    await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', authHeader())
+      .set('Idempotency-Key', key)
+      .send({
+        orderId,
+        method: PaymentMethod.CARD,
+        scenario: 'TIMEOUT_CHARGED',
+      })
+      .expect(202);
+
+    const [r1, r2] = await Promise.all([
+      request(app.getHttpServer())
+        .get(`/payments/${orderId}/status`)
+        .set('Authorization', authHeader()),
+      request(app.getHttpServer())
+        .get(`/payments/${orderId}/status`)
+        .set('Authorization', authHeader()),
+    ]);
+    expect([r1.status, r2.status]).toEqual([200, 200]);
+
+    const paidOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
+    expect(paidOrder.status).toBe(OrderStatus.PAID);
+
+    if (Math.floor((orderRes.body.totalAmount as number) / 10000) > 0) {
+      const earnCount = await prisma.loyaltyTransaction.count({
+        where: { orderId, type: LoyaltyType.EARN },
+      });
+      expect(earnCount).toBe(1);
+    }
+
+    await request(app.getHttpServer())
+      .patch(`/orders/${orderId}/status`)
+      .set('Authorization', authHeader(fixture.staffToken))
+      .send({ status: OrderStatus.PREPARING })
+      .expect(200);
+
+    const afterPreparing = await request(app.getHttpServer())
+      .get(`/payments/${orderId}/status`)
+      .set('Authorization', authHeader())
+      .expect(200);
+    expect(afterPreparing.body.status).toBe('SUCCESS');
+
+    const finalOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
+    expect(finalOrder.status).toBe(OrderStatus.PREPARING);
   });
 });

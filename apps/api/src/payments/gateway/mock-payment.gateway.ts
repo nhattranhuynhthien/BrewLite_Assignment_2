@@ -6,6 +6,7 @@ import { MockPaymentScenario } from '../mock-payment-scenario';
 import {
   ChargeRequest,
   ChargeResult,
+  GatewayProbeResult,
   GatewayStatus,
   GatewayTimeoutError,
   PaymentGateway,
@@ -79,6 +80,19 @@ export class MockPaymentGateway implements PaymentGateway {
       where: { idempotencyKey },
     });
     return transaction?.status ?? 'NOT_FOUND';
+  }
+
+  async getTransaction(idempotencyKey: string): Promise<GatewayProbeResult> {
+    const transaction = await this.prisma.mockGatewayTransaction.findUnique({
+      where: { idempotencyKey },
+    });
+    if (!transaction) {
+      return { status: 'NOT_FOUND' };
+    }
+    if (transaction.status === PaymentStatus.PENDING) {
+      return { status: 'PENDING' };
+    }
+    return this.toChargeResult(transaction);
   }
 
   private toChargeResult(transaction: {

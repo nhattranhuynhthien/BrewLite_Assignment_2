@@ -55,6 +55,10 @@ export class PaymentsController {
     status: 422,
     description: 'Idempotency-Key bị tái sử dụng cho payload khác',
   })
+  @ApiResponse({
+    status: 503,
+    description: 'Cổng thanh toán gián đoạn hoặc giao dịch đang chờ đối soát thủ công',
+  })
   async create(
     @Req() request: AuthenticatedRequest,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -78,6 +82,10 @@ export class PaymentsController {
   @ApiParam({ name: 'orderId', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Trạng thái thanh toán cuối cùng' })
   @ApiResponse({ status: 202, description: 'Vẫn đang chờ phản hồi từ cổng thanh toán' })
+  @ApiResponse({
+    status: 503,
+    description: 'Giao dịch vượt ngưỡng thử lại và đang chờ đối soát thủ công',
+  })
   async getStatus(
     @Req() request: AuthenticatedRequest,
     @Param('orderId', ParseUUIDPipe) orderId: string,
