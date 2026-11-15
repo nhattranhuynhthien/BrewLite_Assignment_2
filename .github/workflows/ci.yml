@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API Quality, Unit & Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: brewlite
+          POSTGRES_PASSWORD: brewlite_ci_password
+          POSTGRES_DB: brewlite_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U brewlite -d brewlite_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://brewlite:brewlite_ci_password@localhost:5432/brewlite_test?schema=public
+      TEST_DATABASE_URL: postgresql://brewlite:brewlite_ci_password@localhost:5432/brewlite_test?schema=public
+      JWT_SECRET: ci_only_non_prod_jwt_secret_key_at_least_32_characters
+      JWT_EXPIRES_IN: 1d
+      CORS_ORIGIN: http://localhost:3000
+      PAYMENT_PROVIDER: mock
+      PAYMENT_WEBHOOK_SECRET: ci_only_webhook_secret_16
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Validate and generate Prisma client
+        working-directory: apps/api
+        run: |
+          npm run prisma:validate
+          npm run prisma:generate
+
+      - name: Deploy Prisma migrations to PostgreSQL
+        working-directory: apps/api
+        run: npm run prisma:migrate:deploy
+
+      - name: Lint API
+        working-directory: apps/api
+        run: npm run lint
+
+      - name: Typecheck API
+        working-directory: apps/api
+        run: npm run typecheck
+
+      - name: Unit tests (API)
+        working-directory: apps/api
+        run: npm test
+
+      - name: Integration tests against real PostgreSQL
+        working-directory: apps/api
+        run: |
+          if ls test/*.e2e-spec.ts 1> /dev/null 2>&1; then
+            npm run test:integration
+          else
+            echo "No integration specs found yet; skipping."
+          fi
+
+      - name: Build API
+        working-directory: apps/api
+        run: npm run build
+
+  web:
+    name: Web Quality, Component Tests & Build
+    runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_API_MOCK: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Web dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Lint Web
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Typecheck Web
+        working-directory: apps/web
+        run: npm run typecheck
+
+      - name: Component & unit tests (Web)
+        working-directory: apps/web
+        run: npm test
+
+      - name: Build Web
+        working-directory: apps/web
+        run: npm run build
+
+  compose:
+    name: Docker Compose Configuration Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
