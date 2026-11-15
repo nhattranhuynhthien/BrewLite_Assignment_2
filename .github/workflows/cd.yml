@@ -86,19 +86,36 @@ jobs:
           node-version: "22"
 
       - name: Trigger Render API Deploy Hook (if configured)
-        if: ${{ secrets.RENDER_API_DEPLOY_HOOK_URL != '' && !(github.event_name == 'workflow_dispatch' && inputs.smoke_only) }}
-        run: curl --fail --silent --show-error -X POST "${{ secrets.RENDER_API_DEPLOY_HOOK_URL }}"
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.smoke_only) }}
+        env:
+          HOOK_URL: ${{ secrets.RENDER_API_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$HOOK_URL" ]; then
+            curl --fail --silent --show-error -X POST "$HOOK_URL"
+          else
+            echo "RENDER_API_DEPLOY_HOOK_URL not configured; skipping."
+          fi
 
       - name: Trigger Render Web Deploy Hook (if configured)
-        if: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL != '' && !(github.event_name == 'workflow_dispatch' && inputs.smoke_only) }}
-        run: curl --fail --silent --show-error -X POST "${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL }}"
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.smoke_only) }}
+        env:
+          HOOK_URL: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$HOOK_URL" ]; then
+            curl --fail --silent --show-error -X POST "$HOOK_URL"
+          else
+            echo "RENDER_WEB_DEPLOY_HOOK_URL not configured; skipping."
+          fi
 
       - name: Wait for Production API /health readiness and run smoke test
-        if: ${{ secrets.PRODUCTION_API_URL != '' }}
         env:
           SMOKE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
           SMOKE_WEB_URL: ${{ secrets.PRODUCTION_WEB_URL }}
         run: |
+          if [ -z "$SMOKE_API_URL" ]; then
+            echo "PRODUCTION_API_URL not configured; skipping smoke test."
+            exit 0
+          fi
           for attempt in $(seq 1 30); do
             if node scripts/smoke-test.mjs; then
               exit 0
