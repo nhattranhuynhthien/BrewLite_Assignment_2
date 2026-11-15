@@ -4,11 +4,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../products/pricing.service';
 import { ProductsService } from '../products/products.service';
+import { PromotionsService } from '../promotions/promotions.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
 const PAGE_SIZE = 20;
@@ -19,6 +22,8 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly productsService: ProductsService,
     private readonly pricingService: PricingService,
+    @Optional() private readonly promotionsService?: PromotionsService,
+    @Optional() private readonly loyaltyService?: LoyaltyService,
   ) {}
 
   async createOrder(userId: string, dto: CreateOrderDto) {
@@ -132,11 +137,52 @@ export class OrdersService {
           (total, item) => total + item.lineTotal,
           0,
         );
-        return tx.order.create({
+
+        let promotionId: string | undefined;
+        let promoDiscount = 0;
+        const promoCode = dto.promoCode?.trim();
+        if (promoCode) {
+          if (!this.promotionsService) {
+            throw new BadRequestException('Dịch vụ khuyến mãi chưa sẵn sàng');
+          }
+          const reservedPromo = await this.promotionsService.reserveInTransaction(
+            tx,
+            promoCode,
+            subtotal,
+          );
+          promotionId = reservedPromo.promotion.id;
+          promoDiscount = reservedPromo.discountAmount;
+        }
+
+        const remainingAfterPromo = Math.max(0, subtotal - promoDiscount);
+        const requestedPoints = dto.redeemPoints ?? 0;
+        let pointsUsed = 0;
+        let loyaltyDiscount = 0;
+        if (requestedPoints > 0) {
+          if (!this.loyaltyService) {
+            throw new BadRequestException('Dịch vụ tích điểm chưa sẵn sàng');
+          }
+          const redeemed =
+            await this.loyaltyService.calculateRedemptionInTransaction(
+              tx,
+              userId,
+              requestedPoints,
+              remainingAfterPromo,
+            );
+          pointsUsed = redeemed.pointsUsed;
+          loyaltyDiscount = redeemed.discountAmount;
+        }
+
+        const discountAmount = promoDiscount + loyaltyDiscount;
+        const totalAmount = Math.max(0, subtotal - discountAmount);
+
+        const order = await tx.order.create({
           data: {
             userId,
             subtotal,
-            totalAmount: subtotal,
+            discountAmount,
+            totalAmount,
+            promotionId,
             note: dto.note?.trim() || undefined,
             items: {
               create: preparedItems.map((item) => ({
@@ -153,6 +199,17 @@ export class OrdersService {
           },
           include: { items: { include: { toppings: true } } },
         });
+
+        if (pointsUsed > 0 && this.loyaltyService) {
+          await this.loyaltyService.recordRedemptionInTransaction(
+            tx,
+            userId,
+            order.id,
+            pointsUsed,
+          );
+        }
+
+        return order;
       },
       { maxWait: 5000, timeout: 10000 },
     );
@@ -196,7 +253,35 @@ export class OrdersService {
       where: { id: orderId, status: OrderStatus.PENDING_PAYMENT },
       data: { status: OrderStatus.PAID },
     });
-    return result.count === 1;
+    if (result.count !== 1) {
+      return false;
+    }
+    if (this.loyaltyService) {
+      await this.loyaltyService.earnForPaidOrder(tx, orderId);
+    }
+    return true;
+  }
+
+  /**
+   * Release reserved inventory, promo slots, and redeemed loyalty points
+   * when an unpaid order fails or expires.
+   */
+  async releaseOrderAdjustments(
+    orderId: string,
+    promotionId: string | null,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const items = await tx.orderItem.findMany({
+      where: { orderId },
+      select: { productId: true, quantity: true },
+    });
+    await this.productsService.restoreStock(items, tx);
+    if (promotionId && this.promotionsService) {
+      await this.promotionsService.releaseInTransaction(tx, promotionId);
+    }
+    if (this.loyaltyService) {
+      await this.loyaltyService.refundOrderRedemption(tx, orderId);
+    }
   }
 
   async markPaymentFailed(
@@ -211,11 +296,17 @@ export class OrdersService {
       return false;
     }
 
-    const items = await tx.orderItem.findMany({
-      where: { orderId },
-      select: { productId: true, quantity: true },
-    });
-    await this.productsService.restoreStock(items, tx);
+    const order = tx.order?.findUnique
+      ? await tx.order.findUnique({
+          where: { id: orderId },
+          select: { promotionId: true },
+        })
+      : null;
+    await this.releaseOrderAdjustments(
+      orderId,
+      order?.promotionId ?? null,
+      tx,
+    );
     return true;
   }
 }

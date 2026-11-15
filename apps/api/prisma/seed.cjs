@@ -119,9 +119,51 @@ async function seedCatalog(client) {
   }
 }
 
+async function seedPromotions(client) {
+  const startsAt = new Date('2025-01-01T00:00:00.000Z');
+  const endsAt = new Date('2030-12-31T23:59:59.000Z');
+
+  for (const promo of [
+    {
+      code: 'BREWLITE10',
+      discountType: 'PERCENT',
+      discountValue: 10,
+      minOrderAmount: 30000,
+      usageLimit: null,
+    },
+    {
+      code: 'GIAM15K',
+      discountType: 'FIXED_AMOUNT',
+      discountValue: 15000,
+      minOrderAmount: 60000,
+      usageLimit: 500,
+    },
+  ]) {
+    await client.promotion.upsert({
+      where: { code: promo.code },
+      update: {
+        discountType: promo.discountType,
+        discountValue: promo.discountValue,
+        minOrderAmount: promo.minOrderAmount,
+        startsAt,
+        endsAt,
+        usageLimit: promo.usageLimit,
+        isActive: true,
+      },
+      create: {
+        ...promo,
+        startsAt,
+        endsAt,
+        isActive: true,
+      },
+    });
+  }
+}
+
 async function main() {
   await seedCatalog(db);
   await seedDemoUsers(db);
+  await seedPromotions(db);
   console.log('BrewLite database seeded cleanly.');
 }
 

@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, api, money } from '../lib/api';
+import {
+  ApiError,
+  api,
+  money,
+  type LoyaltySummary,
+  type Order,
+} from '../lib/api';
+
+export type { Order };
 
 export const STATUS: Record<string, string> = {
   PENDING_PAYMENT: 'Chờ thanh toán',
@@ -14,26 +22,11 @@ export const STATUS: Record<string, string> = {
   CANCELLED: 'Đã hủy',
 };
 
-export type Order = {
-  id: string;
-  status: string;
-  createdAt: string;
-  totalAmount: number;
-  items: {
-    id: string;
-    productName: string;
-    sizeName: string;
-    quantity: number;
-    lineTotal: number;
-    toppings?: { toppingName: string }[];
-  }[];
-  payments?: { status: string }[];
-};
-
 const FINAL = ['PAYMENT_FAILED', 'CANCELLED', 'COMPLETED'];
 
 export function Orders({ id }: { id?: string }) {
   const [items, setItems] = useState<Order[]>([]);
+  const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
   const [page, setPage] = useState(1);
@@ -62,11 +55,13 @@ export function Orders({ id }: { id?: string }) {
           terminal.current = FINAL.includes(order.status);
         }
       } else {
-        const data = await api<{ items: Order[]; total: number }>(
-          `/orders?page=${page}`,
-        );
+        const [data, loyaltyData] = await Promise.all([
+          api<{ items: Order[]; total: number }>(`/orders?page=${page}`),
+          api<LoyaltySummary>('/loyalty/me').catch(() => null),
+        ]);
         setItems(data.items);
         setTotal(data.total);
+        setLoyalty(loyaltyData);
         terminal.current =
           data.items.length > 0 &&
           data.items.every((o) => FINAL.includes(o.status));
@@ -100,6 +95,16 @@ export function Orders({ id }: { id?: string }) {
     <section className="panel">
       <h1 style={{ fontSize: 36 }}>{id ? 'Đơn của bạn' : 'Những ly đã đặt'}</h1>
       {busy && <p role="status">Đang tải đơn…</p>}
+
+      {!id && loyalty && !error && (
+        <div className="notice" style={{ marginBottom: 18 }}>
+          <strong>Điểm tích lũy: {loyalty.balance} điểm</strong>
+          <p className="muted" style={{ margin: '4px 0 0' }}>
+            Tích 1 điểm mỗi {money(loyalty.earnUnitVnd)} thanh toán · Đổi 1
+            điểm giảm {money(loyalty.pointValueVnd)}.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="notice error">
@@ -145,6 +150,13 @@ export function Orders({ id }: { id?: string }) {
               <strong>{money(x.lineTotal)}</strong>
             </div>
           ))}
+
+          {(o.discountAmount ?? 0) > 0 && (
+            <div className="row muted" style={{ marginTop: 8 }}>
+              <span>Đã giảm khuyến mãi / điểm</span>
+              <span>-{money(o.discountAmount ?? 0)}</span>
+            </div>
+          )}
 
           <div className="row">
             <strong>{money(o.totalAmount)}</strong>

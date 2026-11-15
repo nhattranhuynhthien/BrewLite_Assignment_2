@@ -51,4 +51,16 @@ export class CreateOrderDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  @ApiPropertyOptional({ maxLength: 50, example: 'BREWLITE10' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  promoCode?: string;
+
+  @ApiPropertyOptional({ minimum: 0, example: 5 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  redeemPoints?: number;
 }

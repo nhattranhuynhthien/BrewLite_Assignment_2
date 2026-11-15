@@ -21,6 +21,65 @@ export interface Product {
   toppings?: { id: string; name: string; extraPrice: number }[];
 }
 
+export interface Promotion {
+  id: string;
+  code: string;
+  discountType: 'PERCENT' | 'FIXED_AMOUNT';
+  discountValue: number;
+  minOrderAmount: number;
+  startsAt: string;
+  endsAt: string;
+  usageLimit: number | null;
+  usedCount: number;
+}
+
+export interface ValidatedPromotion {
+  valid: true;
+  promotionId: string;
+  code: string;
+  discountType: 'PERCENT' | 'FIXED_AMOUNT';
+  discountValue: number;
+  minOrderAmount: number;
+  discountAmount: number;
+  finalSubtotal: number;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  orderId: string | null;
+  type: 'EARN' | 'REDEEM';
+  points: number;
+  createdAt: string;
+}
+
+export interface LoyaltySummary {
+  balance: number;
+  pointValueVnd: number;
+  earnUnitVnd: number;
+  transactions: LoyaltyTransaction[];
+}
+
+export interface OrderItem {
+  id: string;
+  productName: string;
+  sizeName: string;
+  quantity: number;
+  lineTotal: number;
+  toppings?: { toppingName: string }[];
+}
+
+export interface Order {
+  id: string;
+  status: string;
+  createdAt: string;
+  subtotal?: number;
+  discountAmount?: number;
+  totalAmount: number;
+  note?: string | null;
+  items: OrderItem[];
+  payments?: { status: string }[];
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -62,6 +121,7 @@ export async function api<T>(
   if (!response.ok) {
     if (response.status === 401 && typeof window !== 'undefined') {
       sessionStorage.removeItem('brewlite-token');
+      sessionStorage.removeItem('brewlite-user');
     }
     const msg = Array.isArray(body.message)
       ? body.message.join('. ')

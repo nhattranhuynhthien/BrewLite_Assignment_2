@@ -1,7 +1,12 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { OrderStatus, PaymentMethod, UserRole } from '@prisma/client';
+import {
+  DiscountType,
+  OrderStatus,
+  PaymentMethod,
+  UserRole,
+} from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
@@ -12,6 +17,7 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
   let prisma: PrismaService;
   let jwtService: JwtService;
   let usedKeys: string[] = [];
+  let usedPromoIds: string[] = [];
   let fixture: {
     userId: string;
     otherUserId: string;
@@ -106,10 +112,19 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
         where: { idempotencyKey: { in: usedKeys } },
       });
     }
+    await prisma.loyaltyTransaction.deleteMany({
+      where: { userId: { in: userIds } },
+    });
     await prisma.payment.deleteMany({
       where: { order: { userId: { in: userIds } } },
     });
     await prisma.order.deleteMany({ where: { userId: { in: userIds } } });
+    if (usedPromoIds.length > 0) {
+      await prisma.promotion.deleteMany({
+        where: { id: { in: usedPromoIds } },
+      });
+      usedPromoIds = [];
+    }
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.productTopping.deleteMany({
       where: { productId: fixture.productId },
@@ -452,5 +467,104 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
       expect(updated.status).toBe(200);
       expect(updated.body.status).toBe(nextStatus);
     }
+  });
+
+  it('validates promotions, earns and redeems loyalty points, and rolls back on declined payment', async () => {
+    const promo = await prisma.promotion.create({
+      data: {
+        code: `TEST10-${randomUUID().slice(0, 6).toUpperCase()}`,
+        discountType: DiscountType.PERCENT,
+        discountValue: 10,
+        minOrderAmount: 30000,
+        startsAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 600_000),
+        usageLimit: 1,
+        isActive: true,
+      },
+    });
+    usedPromoIds.push(promo.id);
+
+    const validated = await request(app.getHttpServer())
+      .post('/promotions/validate')
+      .send({ code: promo.code.toLowerCase(), subtotal: 82000 });
+    expect(validated.status).toBe(200);
+    expect(validated.body.discountAmount).toBe(8200);
+
+    const firstOrder = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send({ ...orderPayload(2), promoCode: promo.code });
+    expect(firstOrder.status).toBe(201);
+    expect(firstOrder.body.subtotal).toBe(82000);
+    expect(firstOrder.body.discountAmount).toBe(8200);
+    expect(firstOrder.body.totalAmount).toBe(73800);
+
+    const payKey1 = randomUUID();
+    usedKeys.push(payKey1);
+    const paid = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', authHeader())
+      .set('Idempotency-Key', payKey1)
+      .send({
+        orderId: firstOrder.body.id,
+        method: PaymentMethod.WALLET,
+        scenario: 'SUCCESS',
+      });
+    expect(paid.status).toBe(200);
+
+    const loyaltyAfterEarn = await request(app.getHttpServer())
+      .get('/loyalty/me')
+      .set('Authorization', authHeader());
+    expect(loyaltyAfterEarn.status).toBe(200);
+    expect(loyaltyAfterEarn.body.balance).toBe(7);
+
+    const promo2 = await prisma.promotion.create({
+      data: {
+        code: `ROLLBACK-${randomUUID().slice(0, 6).toUpperCase()}`,
+        discountType: DiscountType.FIXED_AMOUNT,
+        discountValue: 5000,
+        minOrderAmount: 30000,
+        startsAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 600_000),
+        usageLimit: 1,
+        isActive: true,
+      },
+    });
+    usedPromoIds.push(promo2.id);
+
+    const secondOrder = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', authHeader())
+      .send({
+        ...orderPayload(1),
+        promoCode: promo2.code,
+        redeemPoints: 4,
+      });
+    expect(secondOrder.status).toBe(201);
+    expect(secondOrder.body.discountAmount).toBe(9000);
+    expect(secondOrder.body.totalAmount).toBe(32000);
+
+    const payKey2 = randomUUID();
+    usedKeys.push(payKey2);
+    const declined = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', authHeader())
+      .set('Idempotency-Key', payKey2)
+      .send({
+        orderId: secondOrder.body.id,
+        method: PaymentMethod.CARD,
+        scenario: 'DECLINED',
+      });
+    expect(declined.status).toBe(402);
+
+    const loyaltyAfterRollback = await request(app.getHttpServer())
+      .get('/loyalty/me')
+      .set('Authorization', authHeader());
+    expect(loyaltyAfterRollback.body.balance).toBe(7);
+
+    const restoredPromo = await prisma.promotion.findUniqueOrThrow({
+      where: { id: promo2.id },
+    });
+    expect(restoredPromo.usedCount).toBe(0);
   });
 });

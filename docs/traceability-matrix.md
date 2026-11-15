@@ -6,7 +6,6 @@
 ## 1. Quy ước và danh mục tạo phẩm
 
 - `N/A — Won't`: ngoài phạm vi MVP (`FR-09`).
-- `Deferred (Rush 23h MVP Cut)`: hạng mục `Could` (`FR-15`, `FR-34` khuyến mãi/tích điểm) đã chuẩn bị schema/module khung (`PromotionsModule`, `LoyaltyModule`), hoãn triển khai nghiệp vụ để ưu tiên luồng chính; giao diện `/staff` cắt khỏi Web theo `Quy ước`, nhân viên thao tác qua `PATCH /orders/:id/status` (Swagger `/docs`).
 - `MANUAL_PENDING`: các bước hạ tầng/cloud cần tài khoản & secret thật (`Render` HTTPS URLs, `CD` live verification, GitHub ruleset/screenshot).
 - **Sơ đồ & Thiết kế:** `Activity-01` ([activity.puml](diagrams/activity.puml)), `Sequence-01` ([sequence-checkout.puml](diagrams/sequence-checkout.puml)), `Class-01` ([class-domain.puml](diagrams/class-domain.puml)), `Deployment-01` ([deployment-render.puml](diagrams/deployment-render.puml)), `Arch` ([architecture.md](architecture/architecture.md)), `ADR-001`..`ADR-006`.
 
@@ -28,7 +27,7 @@
 | FR-12 | UC-03 | Activity-01, Arch Mục 5, ADR-005 | `apps/web/src/lib/cart.ts` (`CART_KEY = 'brewlite_cart'`, `navigator.locks`, `storage` event) | `apps/web/src/lib/cart.test.ts`, `tests/e2e/checkout.spec.ts` |
 | FR-13 | UC-03 | Activity-01, Arch Mục 5, ADR-005 | `apps/web/src/components/Cart.tsx` | `apps/web/src/components/Cart.test.tsx` |
 | FR-14 | UC-03, UC-01 (E1) | Activity-01, Sequence-01, ADR-002, ADR-005 | `apps/web/src/components/Checkout.tsx` (`/login?next=/checkout` + giữ `brewlite_cart`) | `tests/e2e/checkout.spec.ts` |
-| FR-15 | UC-03, UC-01 (A1) | Class-01 (`Promotion`), ADR-005 | Deferred (Rush 23h MVP Cut): `apps/api/src/promotions/promotions.module.ts`, `schema.prisma` (`Promotion`) | N/A (deferred Could) |
+| FR-15 | UC-03, UC-01 (A1) | Class-01 (`Promotion`), ADR-005 | `apps/api/src/promotions/{promotions.controller.ts,promotions.service.ts}` (`GET /promotions`, `POST /promotions/validate`), `apps/web/src/components/Checkout.tsx` | `apps/api/src/promotions/promotions.service.spec.ts`, `apps/web/src/components/Checkout.test.tsx`, `apps/api/test/orders-payments.e2e-spec.ts` |
 | FR-16 | UC-01…UC-05 (UI mobile-first) | Arch Mục 5, ADR-005 | `apps/web/src/app/globals.css` (`min-height: 48px`, mobile media queries) | `tests/e2e/checkout.spec.ts` (`mobile` project Pixel 5) |
 | FR-17 | Toàn ứng dụng Web/PWA | Deployment-01, Arch Mục 3 & 5, ADR-005 | `apps/web/public/{manifest.webmanifest,sw.js,offline.html,icon.svg}`, `apps/web/src/components/Pwa.tsx` | `npm --prefix apps/web run build` |
 | FR-18 | UC-01…UC-06 (loading/empty/error) | Arch Mục 5, ADR-005, ADR-006 | `Menu.tsx`, `ProductDetail.tsx`, `Cart.tsx`, `Checkout.tsx`, `Orders.tsx` | `Menu.test.tsx`, `Cart.test.tsx` |
@@ -47,11 +46,11 @@
 | FR-31 | UC-01 (E5) | Activity-01, Sequence-01, Arch Mục 7 & 9, ADR-004 | `apps/api/src/payments/payments.service.ts` (`202`, `reconcile` `GET /payments/:orderId/status`), `payment.jobs.ts`, `Orders.tsx` | `orders-payments.e2e-spec.ts` (`TIMEOUT_CHARGED` reconcile) |
 | FR-32 | UC-01 (hủy đơn quá hạn) | Class-01 (`OrderStatus.CANCELLED`), Arch Mục 4 & 9, ADR-004 | `apps/api/src/payments/payment.jobs.ts` (hủy đơn quá 15 phút & hoàn tồn kho) | `npm --prefix apps/api run typecheck` |
 | FR-33 | UC-01 | Activity-01, Sequence-01, ADR-005 | `apps/web/src/components/Checkout.tsx` (xóa mục đã mua khỏi `brewlite_cart`) | `tests/e2e/checkout.spec.ts` |
-| FR-34 | UC-01 (A1) | Class-01 (`Promotion`, `LoyaltyTransaction`), Arch Mục 4 | Deferred (Rush 23h MVP Cut): `apps/api/src/loyalty/loyalty.module.ts`, `schema.prisma` (`LoyaltyTransaction`) | N/A (deferred Could) |
+| FR-34 | UC-01 (A1) | Class-01 (`Promotion`, `LoyaltyTransaction`), Arch Mục 4 | `apps/api/src/promotions/promotions.service.ts`, `apps/api/src/loyalty/{loyalty.controller.ts,loyalty.service.ts}` (`GET /loyalty/me`), `orders.service.ts`, `payment.jobs.ts`, `Checkout.tsx`, `Orders.tsx` | `promotions.service.spec.ts`, `loyalty.service.spec.ts`, `orders.service.spec.ts`, `orders-payments.e2e-spec.ts`, `Checkout.test.tsx` |
 | FR-35 | UC-05 | Activity-01, Class-01 (`Order`, `OrderItem`), Arch Mục 4 & 9, ADR-005 | `apps/api/src/orders/orders.controller.ts` (`GET /orders`, `GET /orders/:id`), `Orders.tsx` | `orders-payments.e2e-spec.ts`, `tests/e2e/checkout.spec.ts` |
 | FR-36 | UC-05 | Activity-01, Class-01 (`Order`, `OrderStatus`), Arch Mục 9, ADR-005 | `apps/web/src/components/Orders.tsx` (hiển thị trạng thái tiếng Việt + ghi nhận timeline) | `tests/e2e/checkout.spec.ts` |
-| FR-37 | UC-06 | Activity-01, Class-01 (`Order`, `UserRole.STAFF`), ADR-002 | `apps/api/src/orders/order-status.controller.ts` (`GET /staff/orders`), `order-status.service.ts` (Swagger/API cho quầy) | `orders-payments.e2e-spec.ts` |
-| FR-38 | UC-06 | Activity-01, Class-01 (`OrderStatus`), ADR-002 | `apps/api/src/orders/order-status.controller.ts` (`PATCH /orders/:id/status`), `order-status.service.ts` (`PAID->PREPARING->READY->COMPLETED`) | `order-status.service.spec.ts`, `orders-payments.e2e-spec.ts`, `tests/e2e/checkout.spec.ts` |
+| FR-37 | UC-06 | Activity-01, Class-01 (`Order`, `UserRole.STAFF`), ADR-002 | `apps/api/src/orders/order-status.controller.ts` (`GET /staff/orders`), `order-status.service.ts`, `apps/web/src/app/staff/page.tsx`, `apps/web/src/components/{Staff.tsx,Shell.tsx}` | `orders-payments.e2e-spec.ts`, `apps/web/src/components/Staff.test.tsx` |
+| FR-38 | UC-06 | Activity-01, Class-01 (`OrderStatus`), ADR-002 | `apps/api/src/orders/order-status.controller.ts` (`PATCH /orders/:id/status`), `order-status.service.ts`, `apps/web/src/components/Staff.tsx` | `order-status.service.spec.ts`, `orders-payments.e2e-spec.ts`, `Staff.test.tsx`, `tests/e2e/checkout.spec.ts` |
 | FR-39 | UC-06 | Class-01 (`OrderStatus`, `UserRole`), ADR-002, ADR-006 | `apps/api/src/orders/order-status.service.ts` (`400` invalid transition, `409` stale conflict), `JwtAuthGuard` (`403`) | `order-status.service.spec.ts`, `orders-payments.e2e-spec.ts` |
 | NFR-01 | UC-02 (hiệu năng đọc menu) | Arch Mục 4 & 6, ADR-003, ADR-006 | `products.service.ts`, `schema.prisma` (`@@index([categoryId, isAvailable])`) | `orders-payments.e2e-spec.ts` |
 | NFR-02 | UC-01 (hiệu năng tạo đơn) | Sequence-01, ADR-004, ADR-006 | `orders.service.ts` (`maxWait: 5000`, `timeout: 10000`) | `orders-payments.e2e-spec.ts` |
