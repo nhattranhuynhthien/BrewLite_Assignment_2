@@ -4,13 +4,21 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
   ApiError,
+  IS_API_MOCK,
   api,
   money,
   type LoyaltySummary,
+  type Order,
   type Promotion,
   type ValidatedPromotion,
 } from '../lib/api';
-import { changeCart, readCart, type CartLine } from '../lib/cart';
+import {
+  changeCart,
+  readCart,
+  readSavedPromo,
+  writeSavedPromo,
+  type CartLine,
+} from '../lib/cart';
 
 type Draft = {
   orderId: string;
@@ -22,6 +30,20 @@ type Draft = {
 };
 
 const DRAFT_KEY = 'brewlite-checkout';
+const PAYMENT_DECLINED_MESSAGE =
+  'Thanh toán bị từ chối. Tồn kho được hoàn lại; giỏ được giữ để bạn tạo đơn mới.';
+
+async function settleSuccess(bought: CartLine[], orderId: string): Promise<void> {
+  await changeCart((cart) =>
+    cart.flatMap((x) => {
+      const count = bought.find((b) => b.key === x.key)?.quantity || 0;
+      return x.quantity > count ? [{ ...x, quantity: x.quantity - count }] : [];
+    }),
+  );
+  sessionStorage.removeItem(DRAFT_KEY);
+  writeSavedPromo();
+  window.location.href = `/orders/${orderId}`;
+}
 
 function formatPromoLabel(promo: Promotion): string {
   return promo.discountType === 'PERCENT'
@@ -50,14 +72,28 @@ export function Checkout() {
   const [ready, setReady] = useState(false);
   const lock = useRef(false);
 
+  function resetDraft(message?: string) {
+    sessionStorage.removeItem(DRAFT_KEY);
+    setDraft(null);
+    setPending(false);
+    setError(message ?? '');
+  }
+
   useEffect(() => {
     if (!sessionStorage.getItem('brewlite-token')) {
       window.location.href = '/login?next=/checkout';
       return;
     }
-    setLines(readCart());
+    const cartLines = readCart();
+    setLines(cartLines);
+    const cartSubtotal = cartLines.reduce(
+      (sum, x) => sum + x.unitPrice * x.quantity,
+      0,
+    );
+
+    let saved: Draft | null = null;
     try {
-      const saved = JSON.parse(
+      saved = JSON.parse(
         sessionStorage.getItem(DRAFT_KEY) || 'null',
       ) as Draft | null;
       if (saved) {
@@ -68,6 +104,11 @@ export function Checkout() {
       sessionStorage.removeItem(DRAFT_KEY);
     }
     setReady(true);
+
+    const savedPromo = !saved ? readSavedPromo() : '';
+    if (savedPromo && cartLines.length > 0) {
+      setPromoInput(savedPromo);
+    }
 
     void Promise.allSettled([
       api<Promotion[]>('/promotions'),
@@ -80,7 +121,77 @@ export function Checkout() {
         setLoyalty(loyaltyRes.value);
       }
     });
+
+    if (saved && !IS_API_MOCK) {
+      void api<Order>(`/orders/${saved.orderId}`)
+        .then((order) => {
+          if (order.status !== 'PENDING_PAYMENT') {
+            resetDraft();
+          }
+        })
+        .catch((err) => {
+          const failure = err as ApiError;
+          if (failure.status === 404) {
+            resetDraft();
+          }
+        });
+    } else if (savedPromo && cartLines.length > 0) {
+      void api<ValidatedPromotion>('/promotions/validate', {
+        method: 'POST',
+        body: JSON.stringify({ code: savedPromo, subtotal: cartSubtotal }),
+      })
+        .then((validated) => {
+          setAppliedPromo(validated);
+          writeSavedPromo(validated.code);
+        })
+        .catch((err) => {
+          writeSavedPromo();
+          setPromoError((err as Error).message);
+        });
+    }
   }, []);
+
+  useEffect(() => {
+    if (!pending || !draft || IS_API_MOCK) {
+      return;
+    }
+    let cancelled = false;
+    const activeDraft = draft;
+    const timer = window.setInterval(() => {
+      void api<{ status: string }>(`/payments/${activeDraft.orderId}/status`)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+          if (result.status === 'SUCCESS') {
+            window.clearInterval(timer);
+            void settleSuccess(activeDraft.lines, activeDraft.orderId);
+          } else if (result.status === 'FAILED') {
+            window.clearInterval(timer);
+            resetDraft(PAYMENT_DECLINED_MESSAGE);
+          }
+        })
+        .catch((err) => {
+          if (cancelled) {
+            return;
+          }
+          const failure = err as ApiError;
+          if (failure.status === 402) {
+            window.clearInterval(timer);
+            resetDraft(PAYMENT_DECLINED_MESSAGE);
+          } else if (failure.status === 503) {
+            window.clearInterval(timer);
+            setPending(false);
+            setError(failure.message);
+          }
+        });
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [pending, draft]);
 
   const shown = draft?.lines || lines;
   const total = shown.reduce((sum, x) => sum + x.unitPrice * x.quantity, 0);
@@ -115,8 +226,10 @@ export function Checkout() {
         body: JSON.stringify({ code, subtotal: total }),
       });
       setAppliedPromo(result);
+      writeSavedPromo(result.code);
     } catch (err) {
       setAppliedPromo(null);
+      writeSavedPromo();
       setPromoError((err as Error).message);
     } finally {
       setPromoBusy(false);
@@ -167,6 +280,7 @@ export function Checkout() {
           totalAmount: order.totalAmount,
         };
         sessionStorage.setItem(DRAFT_KEY, JSON.stringify(current));
+        writeSavedPromo();
         setDraft(current);
       }
 
@@ -181,33 +295,25 @@ export function Checkout() {
       });
 
       if (result.status === 'SUCCESS') {
-        const bought = current.lines;
-        await changeCart((cart) =>
-          cart.flatMap((x) => {
-            const count = bought.find((b) => b.key === x.key)?.quantity || 0;
-            return x.quantity > count
-              ? [{ ...x, quantity: x.quantity - count }]
-              : [];
-          }),
-        );
-        sessionStorage.removeItem(DRAFT_KEY);
-        window.location.href = `/orders/${current.orderId}`;
+        await settleSuccess(current.lines, current.orderId);
       } else {
         setPending(true);
       }
     } catch (err) {
       const failure = err as ApiError;
       if (failure.status === 402) {
-        sessionStorage.removeItem(DRAFT_KEY);
-        setDraft(null);
-        setError(
-          'Thanh toán bị từ chối. Tồn kho được hoàn lại; giỏ được giữ để bạn tạo đơn mới.',
-        );
+        resetDraft(PAYMENT_DECLINED_MESSAGE);
       } else if (failure.status === 401) {
         window.location.href = '/login?next=/checkout';
       } else if (failure.status === 409) {
-        setPending(true);
-        setError(failure.message);
+        if (failure.code === 'IDEMPOTENCY_IN_PROGRESS') {
+          setPending(true);
+          setError(failure.message);
+        } else {
+          resetDraft(
+            `${failure.message} Đơn nháp đã được xóa để bạn tạo đơn mới.`,
+          );
+        }
       } else {
         setError(
           failure.message +
@@ -272,7 +378,7 @@ export function Checkout() {
                 key={promo.id}
                 type="button"
                 className="secondary"
-                style={{ minHeight: 36, padding: '6px 12px', fontSize: 13 }}
+                style={{ minHeight: 48, padding: '10px 14px', fontSize: 13 }}
                 disabled={busy || promoBusy}
                 onClick={() => void applyPromo(promo.code)}
               >
@@ -300,6 +406,7 @@ export function Checkout() {
                   setAppliedPromo(null);
                   setPromoInput('');
                   setPromoError('');
+                  writeSavedPromo();
                 }}
               >
                 Bỏ mã
@@ -443,6 +550,18 @@ export function Checkout() {
             : draft
               ? 'Tiếp tục thanh toán đơn đã tạo'
               : 'Xác nhận đặt và thanh toán'}
+        </button>
+      )}
+
+      {draft && !pending && (
+        <button
+          type="button"
+          className="secondary"
+          style={{ marginTop: 10 }}
+          disabled={busy}
+          onClick={() => resetDraft()}
+        >
+          Hủy đơn nháp / Tạo đơn mới
         </button>
       )}
 

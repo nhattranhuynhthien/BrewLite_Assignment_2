@@ -1,14 +1,8 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { OrdersService } from '../orders/orders.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ProductsService } from '../products/products.service';
 import { PaymentsService } from './payments.service';
 
 const ORDER_EXPIRATION_MS = 15 * 60 * 1000;
@@ -20,9 +14,8 @@ export class PaymentJobs implements OnApplicationBootstrap {
 
   constructor(
     private readonly db: PrismaService,
-    private readonly products: ProductsService,
     private readonly payments: PaymentsService,
-    @Optional() private readonly orders?: OrdersService,
+    private readonly orders: OrdersService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -146,19 +139,11 @@ export class PaymentJobs implements OnApplicationBootstrap {
           return false;
         }
 
-        if (this.orders) {
-          await this.orders.releaseOrderAdjustments(
-            order.id,
-            currentOrder.promotionId,
-            tx,
-          );
-        } else {
-          const items = await tx.orderItem.findMany({
-            where: { orderId: order.id },
-            select: { productId: true, quantity: true },
-          });
-          await this.products.restoreStock(items, tx);
-        }
+        await this.orders.releaseOrderAdjustments(
+          order.id,
+          currentOrder.promotionId,
+          tx,
+        );
         return true;
       });
       if (cancelled) {

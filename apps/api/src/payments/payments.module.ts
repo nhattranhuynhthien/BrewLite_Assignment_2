@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { OrdersModule } from '../orders/orders.module';
-import { ProductsModule } from '../products/products.module';
 import { MockPaymentGateway } from './gateway/mock-payment.gateway';
 import { PAYMENT_GATEWAY } from './gateway/payment-gateway';
 import { PaymentJobs } from './payment.jobs';
@@ -9,7 +8,7 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 
 @Module({
-  imports: [OrdersModule, ProductsModule, ScheduleModule.forRoot()],
+  imports: [OrdersModule, ScheduleModule.forRoot()],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,

@@ -18,8 +18,15 @@ export function Menu() {
     setBusy(true);
     setError('');
     try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (q.trim()) {
+        params.set('q', q.trim());
+      }
+      if (category) {
+        params.set('categoryId', category);
+      }
       const data = await api<{ items: Product[]; total: number }>(
-        `/products?page=${page}&q=${encodeURIComponent(q)}&categoryId=${encodeURIComponent(category)}`,
+        `/products?${params.toString()}`,
       );
       setItems(data.items);
       setTotal(data.total);
@@ -129,9 +136,21 @@ export function Menu() {
               <article className="product" key={product.id}>
                 <div
                   className={`product-art art-${index % 4}`}
-                  aria-hidden="true"
+                  aria-hidden={!product.imageUrl}
                 >
-                  <div className="mini-cup" />
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  ) : (
+                    <div className="mini-cup" />
+                  )}
                 </div>
                 <div className="product-info">
                   <span>{product.category?.name}</span>
@@ -139,13 +158,19 @@ export function Menu() {
                   <p>
                     {product.stockQuantity > 0
                       ? 'Pha mới theo lựa chọn'
-                      : 'Tạm hết hàng'}
+                      : 'Hết hàng'}
                   </p>
                   <div className="product-bottom">
                     <strong>{money(product.basePrice)}</strong>
-                    <Link className="button" href={`/products/${product.id}`}>
-                      Chọn món
-                    </Link>
+                    {product.stockQuantity > 0 ? (
+                      <Link className="button" href={`/products/${product.id}`}>
+                        Chọn món
+                      </Link>
+                    ) : (
+                      <button type="button" className="button" disabled>
+                        Hết hàng
+                      </button>
+                    )}
                   </div>
                 </div>
               </article>

@@ -15,6 +15,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { isUUID } from 'class-validator';
 import { ProductsService } from './products.service';
 
 @ApiTags('Catalog')
@@ -46,7 +47,11 @@ export class ProductsController {
     if (page < 1) {
       throw new BadRequestException('page phải >= 1');
     }
-    return this.products.list(page, categoryId || undefined, q || undefined);
+    const normalizedCategoryId = categoryId?.trim() || undefined;
+    if (normalizedCategoryId && !isUUID(normalizedCategoryId)) {
+      throw new BadRequestException('categoryId phải là UUID hợp lệ');
+    }
+    return this.products.list(page, normalizedCategoryId, q || undefined);
   }
 
   @Get('products/:id')

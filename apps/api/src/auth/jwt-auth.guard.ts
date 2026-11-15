@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { isUUID } from 'class-validator';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -40,8 +41,8 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwt.verifyAsync<{ sub: string }>(token, {
         algorithms: ['HS256'],
       });
-      if (typeof payload.sub !== 'string') {
-        throw new Error('Missing sub claim');
+      if (typeof payload.sub !== 'string' || !isUUID(payload.sub)) {
+        throw new Error('Invalid sub claim');
       }
       sub = payload.sub;
     } catch {

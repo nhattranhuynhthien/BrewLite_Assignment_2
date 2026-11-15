@@ -16,6 +16,12 @@ export function Auth() {
     const email = String(data.get('email') || '');
     const password = String(data.get('password') || '');
 
+    if (new TextEncoder().encode(password).length > 72) {
+      setError('Mật khẩu không được vượt quá 72 byte UTF-8');
+      setBusy(false);
+      return;
+    }
+
     try {
       if (register) {
         await api('/auth/register', {

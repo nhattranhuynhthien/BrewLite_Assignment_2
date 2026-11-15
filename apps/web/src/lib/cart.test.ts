@@ -5,6 +5,7 @@ import {
   changeCart,
   lineKey,
   readCart,
+  updateLineQuantity,
   validLines,
   type CartLine,
 } from './cart';
@@ -46,5 +47,32 @@ describe('cart store (brewlite_cart)', () => {
     expect(validLines([{ ...sampleLine, quantity: -1 }])).toEqual([]);
     localStorage.setItem(CART_KEY, '{corrupt json');
     expect(readCart()).toEqual([]);
+  });
+
+  test('enforces total stock across multiple variants of the same product', () => {
+    const variantA: CartLine = {
+      ...sampleLine,
+      key: 'p-shared:s',
+      productId: 'p-shared',
+      sizeId: 's',
+      sizeName: 'S',
+      quantity: 3,
+      stock: 5,
+    };
+    const variantB: CartLine = {
+      ...sampleLine,
+      key: 'p-shared:m',
+      productId: 'p-shared',
+      sizeId: 'm',
+      sizeName: 'M',
+      quantity: 3,
+      stock: 5,
+    };
+    expect(() => addLine([variantA], variantB)).toThrow(
+      /vượt tồn kho hoặc giới hạn 50/,
+    );
+    expect(() =>
+      updateLineQuantity([variantA, { ...variantB, quantity: 2 }], 'p-shared:m', 3),
+    ).toThrow(/vượt tồn kho hoặc giới hạn 50/);
   });
 });

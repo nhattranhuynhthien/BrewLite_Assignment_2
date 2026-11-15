@@ -57,16 +57,16 @@ export class OrdersController {
     return this.ordersService.history(request.user.id, page);
   }
 
-  @Get(':orderId')
+  @Get(':id')
   @ApiOperation({ summary: 'Chi tiết một đơn hàng thuộc sở hữu của người dùng' })
-  @ApiParam({ name: 'orderId', format: 'uuid' })
+  @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Chi tiết đơn hàng' })
   @ApiResponse({ status: 403, description: 'Đơn hàng thuộc người dùng khác' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn hàng' })
   findOne(
     @Req() request: AuthenticatedRequest,
-    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.ordersService.findOwnedOrder(request.user.id, orderId);
+    return this.ordersService.findOwnedOrder(request.user.id, id);
   }
 }
