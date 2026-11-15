@@ -1,4 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 
 describe('ProductsService', () => {
@@ -38,5 +39,19 @@ describe('ProductsService', () => {
       where: { id: 'p', isAvailable: true, stockQuantity: { gte: 2 } },
       data: { stockQuantity: { decrement: 2 } },
     });
+  });
+
+  it('rejects non-UUID categoryId in ProductsController and ignores empty string', async () => {
+    const listMock = jest.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+    const controller = new ProductsController({ list: listMock } as unknown as ProductsService);
+
+    expect(() => controller.list(1, 'not-a-uuid', undefined)).toThrow(BadRequestException);
+
+    await controller.list(1, '', undefined);
+    expect(listMock).toHaveBeenCalledWith(1, undefined, undefined);
+
+    const validId = '10000000-0000-4000-8000-000000000001';
+    await controller.list(1, validId, 'ca phe');
+    expect(listMock).toHaveBeenCalledWith(1, validId, 'ca phe');
   });
 });

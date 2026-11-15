@@ -14,7 +14,7 @@
 | Kiểm thử E2E | Playwright Test (`tests/e2e/`) | `tests/e2e/` |
 | CI/CD & Container | Docker, Docker Compose, GitHub Actions (`ci.yml`, `cd.yml`) | `.github/workflows/` |
 
-> **Phạm vi MVP chốt:** Tập trung toàn bộ luồng khách hàng trên web/PWA (`Thực đơn -> Chi tiết món -> Giỏ hàng -> Đăng nhập -> Thanh toán mô phỏng -> Theo dõi đơn`). Luồng cập nhật trạng thái quầy của nhân viên (`PAID -> PREPARING -> READY -> COMPLETED`) được thực hiện qua `PATCH /orders/:id/status` (Swagger UI `/docs` với JWT tài khoản `STAFF`).
+> **Phạm vi triển khai:** Bao gồm toàn bộ luồng khách hàng trên web/PWA (`Thực đơn -> Chi tiết món -> Giỏ hàng -> Đăng nhập -> Thanh toán mô phỏng (mã khuyến mãi & đổi điểm tích lũy) -> Theo dõi đơn`) và bảng điều phối quầy cho nhân viên (`/staff`, cập nhật `PAID -> PREPARING -> READY -> COMPLETED` hoặc thao tác qua `PATCH /orders/:id/status` trên Swagger UI `/docs`).
 
 ---
 

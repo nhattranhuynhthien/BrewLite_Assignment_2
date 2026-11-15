@@ -14,6 +14,7 @@ export interface Product {
   id: string;
   name: string;
   description: string;
+  imageUrl?: string | null;
   basePrice: number;
   stockQuantity: number;
   category: Category;
@@ -84,6 +85,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
   }
@@ -126,7 +128,8 @@ export async function api<T>(
     const msg = Array.isArray(body.message)
       ? body.message.join('. ')
       : body.message || 'Không thể xử lý yêu cầu';
-    throw new ApiError(response.status, msg);
+    const code = typeof body?.code === 'string' ? body.code : undefined;
+    throw new ApiError(response.status, msg, code);
   }
 
   return body as T;

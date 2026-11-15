@@ -121,7 +121,9 @@ test('validates promo code, redeems loyalty points, and submits discounted order
     expect(screen.getByText(/hiện có 10 điểm/)).toBeInTheDocument(),
   );
 
-  fireEvent.click(screen.getByRole('button', { name: /BREWLITE10/ }));
+  const promoBtn = screen.getByRole('button', { name: /BREWLITE10/ });
+  expect(promoBtn).toHaveStyle({ minHeight: '48px' });
+  fireEvent.click(promoBtn);
 
   await waitFor(() =>
     expect(screen.getByText(/Đã áp dụng/)).toBeInTheDocument(),
@@ -149,4 +151,83 @@ test('validates promo code, redeems loyalty points, and submits discounted order
     promoCode: 'BREWLITE10',
     redeemPoints: 10,
   });
+});
+
+test('clears stale draft on non-IDEMPOTENCY_IN_PROGRESS 409 error so user can retry ordering', async () => {
+  sessionStorage.setItem('brewlite-token', 'tok-cust');
+  localStorage.setItem(
+    CART_KEY,
+    JSON.stringify([
+      {
+        key: 'p1:s1',
+        productId: 'p1',
+        sizeId: 's1',
+        toppingIds: [],
+        name: 'Bạc xỉu',
+        sizeName: 'M',
+        toppingNames: [],
+        unitPrice: 40000,
+        quantity: 1,
+        stock: 5,
+      },
+    ]),
+  );
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/promotions')) {
+        return { ok: true, json: async () => [] };
+      }
+      if (url.endsWith('/loyalty/me')) {
+        return {
+          ok: true,
+          json: async () => ({
+            balance: 0,
+            pointValueVnd: 1000,
+            earnUnitVnd: 10000,
+            transactions: [],
+          }),
+        };
+      }
+      if (url.endsWith('/orders') && init?.method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({ id: 'order-409', discountAmount: 0, totalAmount: 40000 }),
+        };
+      }
+      if (url.endsWith('/payments') && init?.method === 'POST') {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            code: 'ORDER_NOT_PAYABLE',
+            message: 'Đơn hàng đã hết hạn chờ thanh toán',
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    }),
+  );
+
+  render(<Checkout />);
+  await waitFor(() =>
+    expect(screen.getByText(/Tạm tính 40\.000/)).toBeInTheDocument(),
+  );
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Xác nhận đặt và thanh toán' }),
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /Đơn nháp đã được xóa để bạn tạo đơn mới/,
+    ),
+  );
+  expect(sessionStorage.getItem('brewlite-checkout')).toBeNull();
+  expect(screen.queryByText(/Đơn đang xử lý/)).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Xác nhận đặt và thanh toán' }),
+  ).toBeInTheDocument();
 });

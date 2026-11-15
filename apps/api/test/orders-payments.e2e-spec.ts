@@ -202,6 +202,11 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
     expect(detail.body.sizes).toHaveLength(1);
     expect(detail.body.toppings).toHaveLength(1);
 
+    await request(app.getHttpServer())
+      .get('/products')
+      .query({ categoryId: 'not-a-uuid' })
+      .expect(400);
+
     await prisma.user.delete({ where: { id: reg.body.id } });
   });
 
@@ -222,6 +227,24 @@ describe('BrewLite Order, Payment & Fulfillment Flow (PostgreSQL)', () => {
       .get(`/orders/${created.body.id}`)
       .set('Authorization', authHeader(fixture.otherToken));
     expect(otherView.status).toBe(403);
+
+    const nonUuidToken = jwtService.sign({ sub: '123', role: UserRole.CUSTOMER });
+    await request(app.getHttpServer())
+      .get('/orders?page=1')
+      .set('Authorization', authHeader(nonUuidToken))
+      .expect(401);
+
+    const historyRes = await request(app.getHttpServer())
+      .get('/orders?page=1')
+      .set('Authorization', authHeader())
+      .expect(200);
+    expect(historyRes.body.total).toBe(1);
+    expect(historyRes.body.items[0].id).toBe(created.body.id);
+
+    await request(app.getHttpServer())
+      .get('/orders')
+      .set('Authorization', authHeader())
+      .expect(200);
   });
 
   it('creates an order with server-side pricing, charges once, and replays idempotent payment', async () => {

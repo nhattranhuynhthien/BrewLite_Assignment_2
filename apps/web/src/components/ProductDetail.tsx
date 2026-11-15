@@ -73,6 +73,7 @@ export function ProductDetail({ id }: { id: string }) {
           sizeId: size,
           toppingIds: toppings,
           name: product.name,
+          imageUrl: product.imageUrl ?? null,
           sizeName: selectedSize.name,
           toppingNames: selectedToppings.map((t) => t.name),
           unitPrice,
@@ -95,7 +96,7 @@ export function ProductDetail({ id }: { id: string }) {
       <p className="muted">
         {product.stockQuantity > 0
           ? `Còn ${product.stockQuantity} ly`
-          : 'Tạm hết hàng'}
+          : 'Hết hàng'}
       </p>
 
       <h2>Chọn size</h2>

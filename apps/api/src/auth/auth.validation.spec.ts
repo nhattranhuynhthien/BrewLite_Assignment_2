@@ -211,11 +211,19 @@ describe('Auth validation & guard', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('JwtAuthGuard rejects missing token with 401 and non-staff on StaffOnly with 403', async () => {
-    const jwt = { verifyAsync: jest.fn().mockResolvedValue({ sub: 'u1' }) };
+  it('JwtAuthGuard rejects missing token or non-UUID sub with 401 and non-staff on StaffOnly with 403', async () => {
+    const validUserId = '11111111-1111-4111-8111-111111111111';
+    const jwt = {
+      verifyAsync: jest
+        .fn()
+        .mockResolvedValueOnce({ sub: 'not-a-uuid' })
+        .mockResolvedValue({ sub: validUserId }),
+    };
     const db = {
       user: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'u1', role: 'CUSTOMER' }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: validUserId, role: 'CUSTOMER' }),
       },
     };
     const reflector = {
@@ -231,6 +239,18 @@ describe('Auth validation & guard', () => {
     await expect(guard.canActivate(noTokenCtx as never)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+
+    const nonUuidSubCtx = {
+      switchToHttp: () => ({
+        getRequest: () => ({ headers: { authorization: 'Bearer non-uuid' } }),
+      }),
+      getHandler: () => ({}),
+      getClass: () => ({}),
+    };
+    await expect(
+      guard.canActivate(nonUuidSubCtx as never),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(db.user.findUnique).not.toHaveBeenCalled();
 
     const customerCtx = {
       switchToHttp: () => ({

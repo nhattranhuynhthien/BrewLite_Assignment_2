@@ -888,8 +888,15 @@ describe('PaymentsService', () => {
   });
 
   it('BE-01: serializes pay() and expireStaleOrders() so cancelled order never calls gateway', async () => {
-    const { userId, productId, orderId, promoId, prisma, ordersService } =
-      createHarness({ expiredOrder: true, withPromo: true });
+    const {
+      userId,
+      productId,
+      orderId,
+      promoId,
+      prisma,
+      ordersService,
+      loyaltyService,
+    } = createHarness({ expiredOrder: true, withPromo: true });
     let gatewayCharges = 0;
     const gateway: PaymentGateway = {
       charge: async () => {
@@ -906,7 +913,6 @@ describe('PaymentsService', () => {
     );
     const jobs = new PaymentJobs(
       prisma as never,
-      new ProductsService(prisma as never),
       paymentsService,
       ordersService,
     );
@@ -947,6 +953,7 @@ describe('PaymentsService', () => {
     );
     expect(prisma.state.products.get(productId)!.stockQuantity).toBe(6);
     expect(prisma.state.promotions.get(promoId!)!.usedCount).toBe(0);
+    expect(await loyaltyService.getBalance(prisma as never, userId)).toBe(10);
   });
 
   it('BE-01: when pay() wins the order lock first, expireStaleOrders() does not cancel or release stock', async () => {
@@ -979,7 +986,6 @@ describe('PaymentsService', () => {
     );
     const jobs = new PaymentJobs(
       prisma as never,
-      new ProductsService(prisma as never),
       paymentsService,
       ordersService,
     );
@@ -1069,7 +1075,6 @@ describe('PaymentsService', () => {
     );
     const jobs = new PaymentJobs(
       prisma as never,
-      new ProductsService(prisma as never),
       paymentsService,
       ordersService,
     );

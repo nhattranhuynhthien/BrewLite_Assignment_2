@@ -67,6 +67,15 @@ export const MOCK_LOYALTY: LoyaltySummary = {
   transactions: [],
 };
 
+function normalizeVietnamese(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .trim();
+}
+
 export function handleMockRequest<T>(path: string): T | null {
   const url = new URL(path, 'http://mock.local');
   if (url.pathname === '/categories') {
@@ -79,12 +88,12 @@ export function handleMockRequest<T>(path: string): T | null {
     return MOCK_LOYALTY as T;
   }
   if (url.pathname === '/products') {
-    const q = (url.searchParams.get('q') || '').toLowerCase().trim();
+    const q = normalizeVietnamese(url.searchParams.get('q') || '');
     const categoryId = url.searchParams.get('categoryId') || '';
     const items = MOCK_PRODUCTS.filter(
       (p) =>
         (!categoryId || p.category.id === categoryId) &&
-        (!q || p.name.toLowerCase().includes(q)),
+        (!q || normalizeVietnamese(p.name).includes(q)),
     );
     return { items, total: items.length, page: 1, pageSize: 20 } as T;
   }

@@ -33,4 +33,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "const p=process.env.PORT||process.env.API_PORT||4000;fetch('http://127.0.0.1:'+p+'/health/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1));"
 
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && exec node dist/main.js"]
