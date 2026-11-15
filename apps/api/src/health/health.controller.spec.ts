@@ -6,7 +6,7 @@ describe('HealthController', () => {
     const controller = new HealthController({} as never);
     const response = controller.getLiveness();
 
-    expect(response.status).toBe('ok');
+    expect(response.status).toBe('intentionally-broken-for-I-18');
     expect(response.service).toBe('brewlite-api');
     expect(Number.isNaN(Date.parse(response.timestamp))).toBe(false);
   });
