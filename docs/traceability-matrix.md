@@ -6,7 +6,8 @@
 ## 1. Quy ước và danh mục tạo phẩm
 
 - `N/A — Won't`: ngoài phạm vi MVP (`FR-09`).
-- `PENDING_VIDEO`: hạng mục quay video demo production (`I-41`) đang chờ TV5 quay trên URL production và gắn link bổ sung.
+- **Video Demo Production (`I-41`):** https://drive.google.com/file/d/1dS5-W5MC-p_4SJpQD6M1TPccmSW7MuUD/view?usp=sharing
+- **GitHub Project Board (`I-48`):** https://github.com/users/nhattranhuynhthien/projects/3
 - **Sơ đồ & Thiết kế:** `Activity-01` ([activity.puml](diagrams/activity.puml)), `Sequence-01` ([sequence-checkout.puml](diagrams/sequence-checkout.puml)), `Class-01` ([class-domain.puml](diagrams/class-domain.puml)), `Deployment-01` ([deployment-render.puml](diagrams/deployment-render.puml)), `Arch` ([architecture.md](architecture/architecture.md)), `ADR-001`..`ADR-006`.
 
 ## 2. Bảng ma trận truy vết
@@ -65,10 +66,10 @@
 | NFR-11 | Toàn ứng dụng Web/PWA (trình duyệt) | Arch Mục 5, ADR-005, ADR-006 | `apps/web/src/app/layout.tsx`, `public/manifest.webmanifest`, `public/sw.js` | `tests/e2e/checkout.spec.ts` |
 | NFR-12 | Toàn bộ REST API (Swagger/OpenAPI) | Arch Mục 4, ADR-001 | `apps/api/src/main.ts` (`/docs`), `docs/api-contract.yaml`, `@ApiTags`/`@ApiOperation` trên các controller | `npm --prefix apps/api run build` |
 | NFR-13 | Toàn hệ thống (unit/integration/E2E) | Arch Mục 4 & 10, ADR-006 | `apps/api/src/**/*.spec.ts`, `apps/api/test/orders-payments.e2e-spec.ts`, `apps/web/src/**/*.test.ts(x)`, `tests/e2e/checkout.spec.ts` | Jest (13 suites / 66 unit + 15 integration) + Vitest (8 files / 18 tests) + Playwright |
-| NFR-14 | Quy trình PR (Continuous Integration) | Deployment-01, ADR-001, ADR-006 | `.github/workflows/ci.yml`, `.github/pull_request_template.md` | GitHub Actions CI run (`MANUAL_PENDING` sau khi push PR) |
+| NFR-14 | Quy trình PR (Continuous Integration) | Deployment-01, ADR-001, ADR-006 | `.github/workflows/ci.yml`, `.github/pull_request_template.md` | GitHub Actions CI: PR #84 fail `#43713959130` (`31da54a`) -> pass `#43715218734` (`4ed4ae3`); CI `main` pass `#43735006572` (`75bd0e3`) |
 | NFR-15 | Môi trường local (Docker Compose & seed) | Deployment-01, Arch Mục 6, ADR-001, ADR-003 | `docker-compose.yml`, `.env.example`, `apps/api/prisma/seed.cjs`, `seed-users.cjs` | `docker compose config --quiet` + local stack verify |
 | NFR-16 | Vận hành (`GET /health`) | Deployment-01, Arch Mục 8, ADR-006 | `apps/api/src/health/health.controller.ts`, `scripts/smoke-test.mjs` | `health.controller.spec.ts`, `orders-payments.e2e-spec.ts` |
 | NFR-17 | Vận hành (cấu hình & secrets) | Deployment-01, Arch Mục 8, ADR-001, ADR-002 | `apps/api/src/config/env.validation.ts`, `apps/web/src/lib/env.ts`, `docs/deployment.md` | `env.validation.spec.ts`, `env.test.ts` |
 | NFR-18 | Phát hành (CD, migration & rollback) | Deployment-01, Arch Mục 6, 8 & 12, ADR-001, ADR-003 | `.github/workflows/cd.yml`, `docs/deployment.md` | CD Production Deploy Render thành công; diễn tập rollback `brewlite-api` (`17e4014` <-> `0489efa`) + `scripts/smoke-test.mjs` PASS |
 | NFR-19 | Hạ tầng production Render (HTTPS & DB private) | Deployment-01, Arch Mục 3, 6 & 12, ADR-001, ADR-002 | `apps/api/Dockerfile`, `apps/web/Dockerfile`, `docs/deployment.md` | Live HTTPS: `https://brewlite-web-587y.onrender.com` (200), `https://brewlite-api-nz0h.onrender.com/health` (200, `database: "up"`) |
-| NFR-20 | Bàn giao (release, README & rollback) | Arch Mục 6 & 12, ADR-001 | `README.md`, `RELEASE_NOTES.md`, `docs/deployment.md`, `docs/sprint-2-review.md` | Đã điền URL production thật trong `README.md` & `RELEASE_NOTES.md`, gắn tag `v1.0.0`; `PENDING_VIDEO` cho link Video Demo (`I-41`) |
+| NFR-20 | Bàn giao (release, README & rollback) | Arch Mục 6 & 12, ADR-001 | `README.md`, `RELEASE_NOTES.md`, `docs/deployment.md`, `docs/sprint-2-review.md` | Đủ URL production trong `README.md` & `RELEASE_NOTES.md`, tag `v1.0.0` (`75bd0e3`), Video Demo E2E (`I-41`): https://drive.google.com/file/d/1dS5-W5MC-p_4SJpQD6M1TPccmSW7MuUD/view?usp=sharing, Project Board (`I-48`): https://github.com/users/nhattranhuynhthien/projects/3 |

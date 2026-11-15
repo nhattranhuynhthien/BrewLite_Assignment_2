@@ -2,7 +2,7 @@
 
 Sơ đồ tổng quát: [use-case-overview.svg](../diagrams/use-case-overview.svg) (nguồn: [use-case-overview.puml](../diagrams/use-case-overview.puml)).
 
-![Sơ đồ use-case đặt và thanh toán](./images/use-case-diagram.png)
+![Sơ đồ use-case đặt và thanh toán](./images/use-case-diagram.png) (nguồn: [use-case-checkout.puml](./use-case-checkout.puml))
 
 ## 1. Bảng đặc tả Use Case
 

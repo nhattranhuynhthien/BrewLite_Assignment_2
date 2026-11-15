@@ -78,7 +78,8 @@ E2E_WEB_URL=http://localhost:3000 E2E_API_URL=http://localhost:4000 \
 - **Web PWA Production:** https://brewlite-web-587y.onrender.com
 - **API & Swagger UI:** https://brewlite-api-nz0h.onrender.com/docs
 - **API Health Check:** https://brewlite-api-nz0h.onrender.com/health
-- **Video Demo End-to-End (`I-41`):** *(Chờ TV5 quay trên bản production và bổ sung link sau khi hoàn tất)*
+- **Video Demo End-to-End (`I-41`):** https://drive.google.com/file/d/1dS5-W5MC-p_4SJpQD6M1TPccmSW7MuUD/view?usp=sharing
+- **GitHub Project Board (`I-48`):** https://github.com/users/nhattranhuynhthien/projects/3
 - **API Contract:** [docs/api-contract.yaml](docs/api-contract.yaml)
 - **Hướng dẫn Production & Rollback:** [docs/deployment.md](docs/deployment.md)
 - **SRS & Kiến trúc / ADR:** [docs/requirements/srs.md](docs/requirements/srs.md), [docs/architecture/architecture.md](docs/architecture/architecture.md)
