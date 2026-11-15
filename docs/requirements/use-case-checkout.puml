@@ -1,0 +1,25 @@
+@startuml use-case-checkout
+title UC-01 - Đặt và thanh toán đơn hàng
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Khách hàng" as Customer
+actor "Payment Service\n(mô phỏng)" as Payment
+
+rectangle "BrewLite" {
+  usecase "Áp dụng khuyến mãi /\nđiểm tích lũy\n[FR-15, FR-34]" as UC_Promo
+  usecase "Đặt và thanh toán\nđơn hàng\n[UC-01]" as UC_Checkout
+  usecase "Thanh toán Ví/Thẻ\nkèm Idempotency-Key\n[FR-28..33]" as UC_Pay
+  usecase "Validate giỏ hàng,\ntính giá & trừ kho\ntrong Transaction\n[FR-06..07, FR-25..27]" as UC_CreateOrder
+  usecase "Kiểm tra JWT\n[FR-22]" as UC_Auth
+}
+
+Customer -- UC_Checkout
+UC_Pay -- Payment
+
+UC_Promo ..> UC_Checkout : <<extend>>
+UC_Checkout ..> UC_Pay : <<include>>
+UC_Checkout ..> UC_CreateOrder : <<include>>
+UC_Checkout ..> UC_Auth : <<include>>
+@enduml

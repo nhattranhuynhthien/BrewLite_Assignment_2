@@ -16,6 +16,7 @@
 
 1. **Ràng buộc DB cho thanh toán đồng thời với hai `Idempotency-Key` khác nhau:** Khi kiểm tra integration test đồng thời phát hiện cần thêm partial unique index `payments_one_active_or_success_per_order` (`WHERE status IN ('PENDING', 'SUCCESS')`) trong migration để PostgreSQL chặn hoàn toàn hai giao dịch `PENDING` song song trước khi chạm mock gateway.
 2. **Tổng kết kiểm chứng GitHub & Render Production:**
-   - Đã hoàn tất merge các PR #74–#83 và #86–#88 vào `main` (bao gồm cả tính năng bổ sung `/staff` và `Promotion`/`Loyalty` `I-35`), minh chứng CI đỏ -> xanh (`I-18`, PR #84: fail `31da54a` -> pass `4ed4ae3`), cấp quyền giảng viên & tạo đủ Issue `I-46..I-50`.
+   - Đã hoàn tất merge các PR #74–#83 và #86–#89 vào `main` (`75bd0e3`, bao gồm cả tính năng bổ sung `/staff`, `Promotion`/`Loyalty` `I-35` và cập nhật tài liệu bàn giao), minh chứng CI đỏ -> xanh (`I-18`, PR #84: fail `31da54a` -> pass `4ed4ae3`), cấp quyền giảng viên & tạo đủ Issue `I-46..I-50`.
    - Đã triển khai sống Render PostgreSQL private + API (`https://brewlite-api-nz0h.onrender.com`) + Web (`https://brewlite-web-587y.onrender.com`), diễn tập rollback `brewlite-api` (`0489efa` -> `17e4014` -> khôi phục `0489efa`, `scripts/smoke-test.mjs` PASS), và phát hành tag `v1.0.0`.
-   - **Còn chờ bổ sung:** Quay video demo E2E trên production (`I-41` — TV5) và gắn link video vào `README.md` / `RELEASE_NOTES.md` / Release `v1.0.0`.
+   - **Video Demo E2E trên Production (`I-41` — TV5):** https://drive.google.com/file/d/1dS5-W5MC-p_4SJpQD6M1TPccmSW7MuUD/view?usp=sharing (đã gắn vào `README.md`, `RELEASE_NOTES.md` và `docs/traceability-matrix.md`).
+   - **GitHub Project Board (`I-48`):** https://github.com/users/nhattranhuynhthien/projects/3 (Public — liên kết trực tiếp repo, đủ 51/51 issues với assignee, label và cột `Todo / In Progress / In Review / Done`).

@@ -21,7 +21,7 @@
    - Duyệt khuyến mãi đang hiệu lực (`GET /promotions`), kiểm tra & áp dụng mã giảm giá (`POST /promotions/validate`, kèm `promoCode` trong `POST /orders`), tự hoàn lượt sử dụng khi thanh toán thất bại hoặc hết hạn.
    - Tích điểm sau khi thanh toán thành công (`EARN`), đổi điểm tích lũy (`redeemPoints`) khi đặt đơn và xem số dư/lịch sử giao dịch điểm (`GET /loyalty/me`), hoàn điểm nếu thanh toán không thành công.
 4. **Vận hành Quầy (`/staff`) & Quan sát Hệ thống (`FR-37`–`FR-39`):**
-   - Trang điều phối quầy `/staff` trên Web PWA và API `GET /orders?scope=all`, `PATCH /orders/:id/status` cho phép nhân viên `STAFF` lọc theo trạng thái và chuyển trạng thái tuyến tính (`PAID -> PREPARING -> READY -> COMPLETED`), chặn nhảy cóc/chưa thanh toán (`400`), non-staff (`403`), và xung đột đồng thời (`409`).
+   - Trang điều phối quầy `/staff` trên Web PWA và API `GET /staff/orders`, `PATCH /orders/:id/status` cho phép nhân viên `STAFF` lọc theo trạng thái và chuyển trạng thái tuyến tính (`PAID -> PREPARING -> READY -> COMPLETED`), chặn nhảy cóc/chưa thanh toán (`400`), non-staff (`403`), và xung đột đồng thời (`409`).
    - `GET /health` kiểm tra kết nối PostgreSQL (`200`/`503`), `GET /health/live` kiểm tra liveness, log JSON che dữ liệu nhạy cảm.
 5. **CI/CD & Kiểm thử Tự động:**
    - CI chạy Lint, Typecheck, Jest unit tests, Jest integration tests trên PostgreSQL 16 thật, Vitest component tests, Build API/Web, và Docker Compose config check.
@@ -37,4 +37,5 @@
   - API & Swagger UI: https://brewlite-api-nz0h.onrender.com/docs
   - Health Check: https://brewlite-api-nz0h.onrender.com/health (`{"status":"ok","database":"up"}`)
 - **Hạ tầng Production & Rollback (`I-34`):** Đã triển khai sống Web & API qua CD GitHub Actions -> GHCR -> Render, xác minh smoke test HTTPS `200 OK`, và hoàn tất diễn tập rollback `brewlite-api` từ `0489efa` về `17e4014` rồi khôi phục lại `0489efa`.
-- **Video Demo End-to-End (`I-41`):** *(Chờ TV5 quay trên URL production và bổ sung link sau khi hoàn tất)*
+- **Video Demo End-to-End (`I-41`):** https://drive.google.com/file/d/1dS5-W5MC-p_4SJpQD6M1TPccmSW7MuUD/view?usp=sharing
+- **GitHub Project Board (`I-48`):** https://github.com/users/nhattranhuynhthien/projects/3 (Public — đã liên kết repo và đồng bộ đủ 51/51 issues Sprint 1 & Sprint 2 theo cột `Todo / In Progress / In Review / Done`)
