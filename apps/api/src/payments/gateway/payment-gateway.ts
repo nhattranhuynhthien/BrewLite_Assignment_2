@@ -18,9 +18,14 @@ export interface ChargeResult {
   failureReason?: string;
 }
 
+export type GatewayProbeResult =
+  | ChargeResult
+  | { status: 'PENDING' | 'NOT_FOUND' };
+
 export interface PaymentGateway {
   charge(request: ChargeRequest): Promise<ChargeResult>;
   getStatus(idempotencyKey: string): Promise<GatewayStatus>;
+  getTransaction?(idempotencyKey: string): Promise<GatewayProbeResult>;
 }
 
 export class GatewayTimeoutError extends Error {

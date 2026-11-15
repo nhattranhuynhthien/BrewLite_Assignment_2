@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -7,6 +8,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  BCRYPT_MAX_PASSWORD_BYTES,
+  isWithinBcryptByteLimit,
+} from './password-byte-limit.validator';
 
 @Injectable()
 export class AuthService {
@@ -15,7 +20,16 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
+  private assertPasswordByteLimit(password: string): void {
+    if (!isWithinBcryptByteLimit(password)) {
+      throw new BadRequestException(
+        `Mật khẩu không được vượt quá ${BCRYPT_MAX_PASSWORD_BYTES} byte UTF-8`,
+      );
+    }
+  }
+
   async register(email: string, password: string, fullName: string) {
+    this.assertPasswordByteLimit(password);
     try {
       const user = await this.db.user.create({
         data: {
@@ -42,6 +56,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
+    this.assertPasswordByteLimit(password);
     const user = await this.db.user.findUnique({
       where: { email: email.toLowerCase().trim() },
     });

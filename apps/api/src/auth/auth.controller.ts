@@ -2,16 +2,26 @@ import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
+import {
+  BCRYPT_MAX_PASSWORD_BYTES,
+  MaxUtf8Bytes,
+} from './password-byte-limit.validator';
 
 export class LoginDto {
   @ApiProperty({ example: 'customer@brewlite.local' })
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ example: 'BrewLite123!', minLength: 8, maxLength: 72 })
+  @ApiProperty({
+    example: 'BrewLite123!',
+    minLength: 8,
+    maxLength: 72,
+    description: 'Tối thiểu 8 ký tự và tối đa 72 byte UTF-8',
+  })
   @IsString()
   @MinLength(8)
   @MaxLength(72)
+  @MaxUtf8Bytes(BCRYPT_MAX_PASSWORD_BYTES)
   password!: string;
 }
 
@@ -30,11 +40,12 @@ export class RegisterDto {
     example: 'BrewLite123!',
     minLength: 8,
     maxLength: 72,
-    description: 'Tối thiểu 8 ký tự gồm chữ cái và chữ số',
+    description: 'Tối thiểu 8 ký tự gồm chữ cái và chữ số, tối đa 72 byte UTF-8',
   })
   @IsString()
   @MinLength(8)
   @MaxLength(72)
+  @MaxUtf8Bytes(BCRYPT_MAX_PASSWORD_BYTES)
   @Matches(/^(?=.*[A-Za-z])(?=.*\d).{8,72}$/, {
     message: 'Mật khẩu cần ít nhất 8 ký tự gồm chữ và số',
   })
