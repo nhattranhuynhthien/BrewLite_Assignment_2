@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { ApiError, api, money } from '../lib/api';
+import {
+  ApiError,
+  api,
+  money,
+  type LoyaltySummary,
+  type Promotion,
+  type ValidatedPromotion,
+} from '../lib/api';
 import { changeCart, readCart, type CartLine } from '../lib/cart';
 
 type Draft = {
@@ -10,15 +17,32 @@ type Draft = {
   key: string;
   method: 'WALLET' | 'CARD';
   lines: CartLine[];
+  discountAmount?: number;
+  totalAmount?: number;
 };
 
 const DRAFT_KEY = 'brewlite-checkout';
+
+function formatPromoLabel(promo: Promotion): string {
+  return promo.discountType === 'PERCENT'
+    ? `-${promo.discountValue}%`
+    : `-${money(promo.discountValue)}`;
+}
 
 export function Checkout() {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<'WALLET' | 'CARD'>('WALLET');
   const [scenario, setScenario] = useState('SUCCESS');
   const [note, setNote] = useState('');
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<ValidatedPromotion | null>(
+    null,
+  );
+  const [promoError, setPromoError] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
+  const [redeemPoints, setRedeemPoints] = useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,7 +68,60 @@ export function Checkout() {
       sessionStorage.removeItem(DRAFT_KEY);
     }
     setReady(true);
+
+    void Promise.allSettled([
+      api<Promotion[]>('/promotions'),
+      api<LoyaltySummary>('/loyalty/me'),
+    ]).then(([promoRes, loyaltyRes]) => {
+      if (promoRes.status === 'fulfilled') {
+        setPromotions(promoRes.value);
+      }
+      if (loyaltyRes.status === 'fulfilled') {
+        setLoyalty(loyaltyRes.value);
+      }
+    });
   }, []);
+
+  const shown = draft?.lines || lines;
+  const total = shown.reduce((sum, x) => sum + x.unitPrice * x.quantity, 0);
+  const pointValueVnd = loyalty?.pointValueVnd ?? 1000;
+  const promoDiscount = appliedPromo?.discountAmount ?? 0;
+  const remainingAfterPromo = Math.max(0, total - promoDiscount);
+  const maxUsablePoints = loyalty
+    ? Math.min(loyalty.balance, Math.floor(remainingAfterPromo / pointValueVnd))
+    : 0;
+  const effectiveRedeemPoints = Math.min(redeemPoints, maxUsablePoints);
+  const loyaltyDiscount = effectiveRedeemPoints * pointValueVnd;
+  const previewDiscount = promoDiscount + loyaltyDiscount;
+  const displayedDiscount = draft?.discountAmount ?? previewDiscount;
+  const displayedFinalTotal =
+    draft?.totalAmount ?? Math.max(0, total - displayedDiscount);
+
+  async function applyPromo(codeOverride?: string) {
+    const code = (codeOverride ?? promoInput).trim().toUpperCase();
+    if (!code) {
+      setAppliedPromo(null);
+      setPromoError('Vui lòng nhập mã khuyến mãi');
+      return;
+    }
+    if (codeOverride) {
+      setPromoInput(code);
+    }
+    setPromoBusy(true);
+    setPromoError('');
+    try {
+      const result = await api<ValidatedPromotion>('/promotions/validate', {
+        method: 'POST',
+        body: JSON.stringify({ code, subtotal: total }),
+      });
+      setAppliedPromo(result);
+    } catch (err) {
+      setAppliedPromo(null);
+      setPromoError((err as Error).message);
+    } finally {
+      setPromoBusy(false);
+    }
+  }
 
   async function pay() {
     if (lock.current) {
@@ -61,7 +138,11 @@ export function Checkout() {
         if (!actual.length) {
           throw new Error('Giỏ hàng đang trống');
         }
-        const order = await api<{ id: string }>('/orders', {
+        const order = await api<{
+          id: string;
+          discountAmount?: number;
+          totalAmount?: number;
+        }>('/orders', {
           method: 'POST',
           body: JSON.stringify({
             items: actual.map((item) => ({
@@ -71,6 +152,10 @@ export function Checkout() {
               quantity: item.quantity,
             })),
             ...(note.trim() ? { note: note.trim() } : {}),
+            ...(appliedPromo ? { promoCode: appliedPromo.code } : {}),
+            ...(effectiveRedeemPoints > 0
+              ? { redeemPoints: effectiveRedeemPoints }
+              : {}),
           }),
         });
         current = {
@@ -78,6 +163,8 @@ export function Checkout() {
           key: crypto.randomUUID(),
           method,
           lines: actual,
+          discountAmount: order.discountAmount,
+          totalAmount: order.totalAmount,
         };
         sessionStorage.setItem(DRAFT_KEY, JSON.stringify(current));
         setDraft(current);
@@ -137,9 +224,6 @@ export function Checkout() {
     return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   }
 
-  const shown = draft?.lines || lines;
-  const total = shown.reduce((sum, x) => sum + x.unitPrice * x.quantity, 0);
-
   return (
     <section className="panel">
       <h1 style={{ fontSize: 36 }}>Chốt ly ngon nhé.</h1>
@@ -154,7 +238,140 @@ export function Checkout() {
         </div>
       ))}
 
+      <div style={{ margin: '18px 0' }}>
+        <label>
+          Mã khuyến mãi
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input
+              name="promoCode"
+              maxLength={50}
+              placeholder="BREWLITE10"
+              disabled={!!draft || busy || promoBusy}
+              value={promoInput}
+              style={{ marginBottom: 0, flex: 1 }}
+              onChange={(e) => {
+                setPromoInput(e.target.value);
+                setPromoError('');
+              }}
+            />
+            <button
+              type="button"
+              className="secondary"
+              disabled={!!draft || busy || promoBusy || !shown.length}
+              onClick={() => void applyPromo()}
+            >
+              {promoBusy ? 'Đang kiểm…' : 'Áp dụng'}
+            </button>
+          </div>
+        </label>
+
+        {promotions.length > 0 && !draft && (
+          <div className="choices" style={{ marginTop: 8, marginBottom: 8 }}>
+            {promotions.map((promo) => (
+              <button
+                key={promo.id}
+                type="button"
+                className="secondary"
+                style={{ minHeight: 36, padding: '6px 12px', fontSize: 13 }}
+                disabled={busy || promoBusy}
+                onClick={() => void applyPromo(promo.code)}
+              >
+                {promo.code} ({formatPromoLabel(promo)}
+                {promo.minOrderAmount > 0
+                  ? `, đơn từ ${money(promo.minOrderAmount)}`
+                  : ''}
+                )
+              </button>
+            ))}
+          </div>
+        )}
+
+        {appliedPromo && (
+          <div className="notice row" style={{ padding: '10px 14px', margin: '8px 0' }}>
+            <span>
+              Đã áp dụng <strong>{appliedPromo.code}</strong>: giảm{' '}
+              {money(appliedPromo.discountAmount)}
+            </span>
+            {!draft && (
+              <button
+                type="button"
+                className="textbutton"
+                onClick={() => {
+                  setAppliedPromo(null);
+                  setPromoInput('');
+                  setPromoError('');
+                }}
+              >
+                Bỏ mã
+              </button>
+            )}
+          </div>
+        )}
+
+        {promoError && (
+          <p role="alert" className="notice error" style={{ padding: '10px 14px' }}>
+            {promoError}
+          </p>
+        )}
+      </div>
+
+      {loyalty && (
+        <div style={{ margin: '12px 0 18px' }}>
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <label style={{ flex: 1, marginBottom: 0 }}>
+              Đổi điểm tích lũy (hiện có {loyalty.balance} điểm · 1 điểm ={' '}
+              {money(pointValueVnd)})
+              <input
+                name="redeemPoints"
+                type="number"
+                min={0}
+                max={maxUsablePoints}
+                disabled={!!draft || busy || maxUsablePoints === 0}
+                value={effectiveRedeemPoints}
+                style={{ marginBottom: 0 }}
+                onChange={(e) => {
+                  const parsed = Math.max(
+                    0,
+                    Math.floor(Number(e.target.value) || 0),
+                  );
+                  setRedeemPoints(Math.min(parsed, maxUsablePoints));
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!!draft || busy || maxUsablePoints === 0}
+              style={{ alignSelf: 'flex-end' }}
+              onClick={() => setRedeemPoints(maxUsablePoints)}
+            >
+              Dùng tối đa
+            </button>
+          </div>
+        </div>
+      )}
+
       <p className="price">Tạm tính {money(total)}</p>
+
+      {displayedDiscount > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          {promoDiscount > 0 && !draft && (
+            <div className="row muted">
+              <span>Giảm khuyến mãi ({appliedPromo?.code})</span>
+              <span>-{money(promoDiscount)}</span>
+            </div>
+          )}
+          {loyaltyDiscount > 0 && !draft && (
+            <div className="row muted">
+              <span>Đổi {effectiveRedeemPoints} điểm tích lũy</span>
+              <span>-{money(loyaltyDiscount)}</span>
+            </div>
+          )}
+          <p className="price" data-testid="checkout-final-total">
+            Tổng thanh toán {money(displayedFinalTotal)}
+          </p>
+        </div>
+      )}
 
       <label>
         Ghi chú cho quầy

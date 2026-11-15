@@ -21,6 +21,10 @@ tags:
     description: Order placement, history, detail, and staff status progression
   - name: Payments
     description: Idempotent mock payment processing and reconciliation
+  - name: Promotions
+    description: Active promotion catalog and server-side discount validation
+  - name: Loyalty
+    description: Customer loyalty points balance and transaction history
 
 components:
   securitySchemes:
@@ -43,6 +47,12 @@ components:
         - READY
         - COMPLETED
         - CANCELLED
+    DiscountType:
+      type: string
+      enum: [PERCENT, FIXED_AMOUNT]
+    LoyaltyType:
+      type: string
+      enum: [EARN, REDEEM]
     PaymentMethod:
       type: string
       enum: [WALLET, CARD]
@@ -254,6 +264,103 @@ components:
         note:
           type: string
           maxLength: 500
+        promoCode:
+          type: string
+          maxLength: 50
+          example: BREWLITE10
+        redeemPoints:
+          type: integer
+          minimum: 0
+          example: 5
+    Promotion:
+      type: object
+      required: [id, code, discountType, discountValue, minOrderAmount, startsAt, endsAt, usedCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        discountType:
+          $ref: '#/components/schemas/DiscountType'
+        discountValue:
+          type: integer
+        minOrderAmount:
+          type: integer
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        usageLimit:
+          type: integer
+          nullable: true
+        usedCount:
+          type: integer
+    ValidatePromotionRequest:
+      type: object
+      required: [code, subtotal]
+      properties:
+        code:
+          type: string
+          maxLength: 50
+        subtotal:
+          type: integer
+          minimum: 0
+    ValidatedPromotion:
+      type: object
+      required: [valid, promotionId, code, discountType, discountValue, minOrderAmount, discountAmount, finalSubtotal]
+      properties:
+        valid:
+          type: boolean
+        promotionId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        discountType:
+          $ref: '#/components/schemas/DiscountType'
+        discountValue:
+          type: integer
+        minOrderAmount:
+          type: integer
+        discountAmount:
+          type: integer
+        finalSubtotal:
+          type: integer
+    LoyaltyTransaction:
+      type: object
+      required: [id, type, points, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+          nullable: true
+        type:
+          $ref: '#/components/schemas/LoyaltyType'
+        points:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    LoyaltySummary:
+      type: object
+      required: [balance, pointValueVnd, earnUnitVnd, transactions]
+      properties:
+        balance:
+          type: integer
+        pointValueVnd:
+          type: integer
+        earnUnitVnd:
+          type: integer
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoyaltyTransaction'
     OrderItemTopping:
       type: object
       required: [id, toppingId, toppingName, extraPrice]
@@ -758,3 +865,50 @@ paths:
           description: Order belongs to another user
         '404':
           description: Order not found
+  /promotions:
+    get:
+      tags: [Promotions]
+      summary: List active promotions with remaining usage capacity
+      responses:
+        '200':
+          description: Active promotion list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Promotion'
+  /promotions/validate:
+    post:
+      tags: [Promotions]
+      summary: Validate a promotion code and compute estimated discount for a subtotal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidatePromotionRequest'
+      responses:
+        '200':
+          description: Promotion code is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidatedPromotion'
+        '400':
+          description: Invalid, inactive, expired, below minimum subtotal, or exhausted promotion code
+  /loyalty/me:
+    get:
+      tags: [Loyalty]
+      security:
+        - BearerAuth: []
+      summary: Get current customer's loyalty balance and recent point ledger
+      responses:
+        '200':
+          description: Loyalty balance and recent transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltySummary'
+        '401':
+          description: Unauthorized

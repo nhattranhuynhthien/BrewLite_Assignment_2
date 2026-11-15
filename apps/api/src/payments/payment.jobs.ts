@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
+import { OrdersService } from '../orders/orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import { PaymentsService } from './payments.service';
@@ -13,6 +14,7 @@ export class PaymentJobs {
     private readonly db: PrismaService,
     private readonly products: ProductsService,
     private readonly payments: PaymentsService,
+    @Optional() private readonly orders?: OrdersService,
   ) {}
 
   @Interval(30000)
@@ -57,11 +59,19 @@ export class PaymentJobs {
             data: { status: 'CANCELLED' },
           });
           if (changed.count === 1) {
-            const items = await tx.orderItem.findMany({
-              where: { orderId: order.id },
-              select: { productId: true, quantity: true },
-            });
-            await this.products.restoreStock(items, tx);
+            if (this.orders) {
+              await this.orders.releaseOrderAdjustments(
+                order.id,
+                order.promotionId,
+                tx,
+              );
+            } else {
+              const items = await tx.orderItem.findMany({
+                where: { orderId: order.id },
+                select: { productId: true, quantity: true },
+              });
+              await this.products.restoreStock(items, tx);
+            }
           }
         });
       }
