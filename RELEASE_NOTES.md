@@ -1,7 +1,7 @@
 # BrewLite v1.0.0 — Release Notes
 
-- **Ngày phát hành mục tiêu:** 2026-11-15
-- **Tag phát hành:** `v1.0.0` (tạo sau khi merge toàn bộ 8 PR và chạy CD lên Render production)
+- **Ngày phát hành:** 2026-11-15
+- **Tag phát hành:** `v1.0.0` (gắn trên `main` sau khi hoàn tất triển khai Render production và kiểm chứng smoke test)
 - **Phạm vi:** Assignment 2 — BrewLite Coffee Ordering MVP
 
 ---
@@ -32,4 +32,9 @@
 ## 2. Trạng thái Triển khai & Ghi chú Phát hành
 
 - **Hạng mục đã hoàn thiện thêm:** Kích hoạt đầy đủ tính năng Khuyến mãi (`PromotionsModule`), Tích điểm (`LoyaltyModule`) và giao diện Vận hành Quầy (`/staff`) trên Web frontend lẫn API backend.
-- **Trạng thái hạ tầng cloud:** `MANUAL_PENDING` cho tới khi TV1/TV2 hoàn tất deploy Render production, smoke test HTTPS URL và tag release `v1.0.0`.
+- **URL Production (Render):**
+  - Web PWA: https://brewlite-web-587y.onrender.com
+  - API & Swagger UI: https://brewlite-api-nz0h.onrender.com/docs
+  - Health Check: https://brewlite-api-nz0h.onrender.com/health (`{"status":"ok","database":"up"}`)
+- **Hạ tầng Production & Rollback (`I-34`):** Đã triển khai sống Web & API qua CD GitHub Actions -> GHCR -> Render, xác minh smoke test HTTPS `200 OK`, và hoàn tất diễn tập rollback `brewlite-api` từ `0489efa` về `17e4014` rồi khôi phục lại `0489efa`.
+- **Video Demo End-to-End (`I-41`):** *(Chờ TV5 quay trên URL production và bổ sung link sau khi hoàn tất)*

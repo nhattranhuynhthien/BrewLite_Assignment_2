@@ -73,8 +73,12 @@ E2E_WEB_URL=http://localhost:3000 E2E_API_URL=http://localhost:4000 \
 
 ---
 
-## 4. Triển khai & Tài liệu Liên quan
+## 4. Triển khai Production (Render) & Tài liệu Liên quan
 
+- **Web PWA Production:** https://brewlite-web-587y.onrender.com
+- **API & Swagger UI:** https://brewlite-api-nz0h.onrender.com/docs
+- **API Health Check:** https://brewlite-api-nz0h.onrender.com/health
+- **Video Demo End-to-End (`I-41`):** *(Chờ TV5 quay trên bản production và bổ sung link sau khi hoàn tất)*
 - **API Contract:** [docs/api-contract.yaml](docs/api-contract.yaml)
 - **Hướng dẫn Production & Rollback:** [docs/deployment.md](docs/deployment.md)
 - **SRS & Kiến trúc / ADR:** [docs/requirements/srs.md](docs/requirements/srs.md), [docs/architecture/architecture.md](docs/architecture/architecture.md)
