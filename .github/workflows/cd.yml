@@ -1,0 +1,110 @@
+name: CD Production Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      smoke_only:
+        description: "Only run production smoke test without triggering redeploy"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  precheck-gate:
+    name: Verify CI Success Gate
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Confirm deployment gate
+        run: echo "CI gate satisfied for commit ${{ github.sha }}"
+
+  build-and-push-images:
+    name: Build & Push Immutable Images to GHCR
+    needs: precheck-gate
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.smoke_only) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase image prefix and immutable tag
+        id: meta
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-12)
+          echo "api_image=ghcr.io/${OWNER}/brewlite-api" >> "$GITHUB_OUTPUT"
+          echo "web_image=ghcr.io/${OWNER}/brewlite-web" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.tag }}
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.PRODUCTION_API_URL || 'http://localhost:4000' }}
+            NEXT_PUBLIC_API_MOCK=false
+          tags: ${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.tag }}
+
+  deploy-and-smoke:
+    name: Trigger Render Deploy & Run Smoke Test
+    needs: [precheck-gate, build-and-push-images]
+    if: always() && needs.precheck-gate.result == 'success' && (needs.build-and-push-images.result == 'success' || needs.build-and-push-images.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Trigger Render API Deploy Hook (if configured)
+        if: ${{ secrets.RENDER_API_DEPLOY_HOOK_URL != '' && !(github.event_name == 'workflow_dispatch' && inputs.smoke_only) }}
+        run: curl --fail --silent --show-error -X POST "${{ secrets.RENDER_API_DEPLOY_HOOK_URL }}"
+
+      - name: Trigger Render Web Deploy Hook (if configured)
+        if: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL != '' && !(github.event_name == 'workflow_dispatch' && inputs.smoke_only) }}
+        run: curl --fail --silent --show-error -X POST "${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL }}"
+
+      - name: Wait for Production API /health readiness and run smoke test
+        if: ${{ secrets.PRODUCTION_API_URL != '' }}
+        env:
+          SMOKE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+          SMOKE_WEB_URL: ${{ secrets.PRODUCTION_WEB_URL }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if node scripts/smoke-test.mjs; then
+              exit 0
+            fi
+            echo "Attempt $attempt/30 failed; retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::Production smoke test failed! Execute rollback runbook in docs/deployment.md."
+          exit 1
