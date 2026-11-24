@@ -1,0 +1,12 @@
+name: BrewLite Local
+values:
+  - key: baseUrl
+    value: 'http://127.0.0.1:4001'
+  - key: staffEmail
+    value: staff@brewlite.local
+  - key: staffPassword
+    value: BrewLiteStaff123!
+  - key: customerPassword
+    value: BrewLite123!
+  - key: expectDatabaseDown
+    value: 'false'

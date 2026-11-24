@@ -1,0 +1,2726 @@
+{
+  "info": {
+    "name": "BrewLite API Tests",
+    "description": "Kiểm thử API BrewLite hiện có trong source: health, auth, catalog và xử lý đơn hàng của nhân viên. Seed danh mục và tài khoản mẫu một lần, sau đó collection tự tạo đơn mẫu cho mỗi lượt chạy. Xem docs/postman/README.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "01 Health và Swagger",
+      "item": [
+        {
+          "name": "Liveness (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let body;",
+                  "try { body = pm.response.json(); } catch {}",
+                  "if (pm.response.code !== 200 || body?.service !== \"brewlite-api\") {",
+                  "  pm.execution.setNextRequest(null);",
+                  "}",
+                  "pm.test(\"baseUrl trỏ tới API BrewLite và liveness trả timestamp hợp lệ\", function () {",
+                  "  pm.expect(body, \"Kiểm tra baseUrl và chạy API từ source hiện tại\").to.be.an(\"object\");",
+                  "  pm.expect(body.service, \"Kiểm tra baseUrl và phiên bản API đang chạy\").to.equal(\"brewlite-api\");",
+                  "  pm.expect(body.status).to.equal(\"ok\");",
+                  "  pm.expect(body.timestamp).to.be.a(\"string\");",
+                  "  pm.expect(Number.isNaN(Date.parse(body.timestamp))).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "live"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Readiness (200 hoặc 503 khi DB ngắt)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const databaseDown = pm.variables.get(\"expectDatabaseDown\") === \"true\";",
+                  "const expectedCode = databaseDown ? 503 : 200;",
+                  "pm.test(\"HTTP khớp trạng thái PostgreSQL mong đợi\", function () {",
+                  "  pm.response.to.have.status(expectedCode);",
+                  "});",
+                  "pm.test(\"Trạng thái dịch vụ, PostgreSQL và timestamp khớp với readiness\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.service).to.equal(\"brewlite-api\");",
+                  "  pm.expect(body.status).to.equal(databaseDown ? \"error\" : \"ok\");",
+                  "  pm.expect(body.database).to.equal(databaseDown ? \"down\" : \"up\");",
+                  "  pm.expect(body.timestamp).to.be.a(\"string\");",
+                  "  pm.expect(Number.isNaN(Date.parse(body.timestamp))).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Mặc định kiểm tra PostgreSQL đang hoạt động. Đặt expectDatabaseDown=true và gửi riêng request này để kiểm tra 503 khi API còn chạy nhưng PostgreSQL đã ngắt."
+          },
+          "response": []
+        },
+        {
+          "name": "Swagger JSON liệt kê các endpoint đã triển khai (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"OpenAPI có đủ endpoint nghiệp vụ đã triển khai\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.openapi).to.match(/^3\\./);",
+                  "  pm.expect(body.info.title).to.equal(\"BrewLite API\");",
+                  "  const routes = {\"/health/live\":\"get\",\"/health\":\"get\",\"/auth/register\":\"post\",\"/auth/login\":\"post\",\"/categories\":\"get\",\"/products\":\"get\",\"/products/{id}\":\"get\",\"/staff/orders\":\"get\",\"/orders/{id}/status\":\"patch\"};",
+                  "  Object.entries(routes).forEach(([path, method]) => {",
+                  "    pm.expect(body.paths, path).to.have.property(path);",
+                  "    pm.expect(body.paths[path], method + \" \" + path).to.have.property(method);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs-json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "docs-json"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 Xác thực",
+      "description": "Đăng ký tạo email mới mỗi lần chạy. Login lưu JWT vào biến collection để các request phân quyền sử dụng.",
+      "item": [
+        {
+          "name": "Đăng ký CUSTOMER và chuẩn hóa dữ liệu (201)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"registeredUserId\");",
+                  "const guid = pm.variables.replaceIn(\"{{$guid}}\");",
+                  "pm.collectionVariables.set(\"registrationEmail\", \"Postman-\" + guid + \"@example.test\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Tài khoản mới đúng dữ liệu, mặc định CUSTOMER\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "  pm.expect(body.email).to.equal(pm.variables.get(\"registrationEmail\").toLowerCase());",
+                  "  pm.expect(body).to.include({ fullName: \"Postman Customer\", role: \"CUSTOMER\" });",
+                  "  pm.expect(body).to.not.have.property(\"passwordHash\");",
+                  "  if (pm.response.code === 201) pm.collectionVariables.set(\"registeredUserId\", body.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\",\n  \"fullName\": \"  Postman Customer  \",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng ký lại cùng email (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(409);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\",\n  \"fullName\": \"  Postman Customer  \",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng ký với email và mật khẩu sai định dạng (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message).to.be.an(\"array\");",
+                  "  pm.expect(body.message.some(message => message.includes(\"email\"))).to.equal(true);",
+                  "  pm.expect(body.message.some(message => message.includes(\"fullName\"))).to.equal(true);",
+                  "  pm.expect(body.message.length).to.be.at.least(3);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"invalid-email\",\n  \"fullName\": \"X\",\n  \"password\": \"abcdefgh\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Từ chối trường role khi đăng ký (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message).to.include(\"property role should not exist\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\",\n  \"fullName\": \"  Postman Customer  \",\n  \"password\": \"{{customerPassword}}\",\n  \"role\": \"STAFF\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập CUSTOMER vừa đăng ký (200)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"customerToken\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"JWT và tài khoản CUSTOMER hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property(\"accessToken\").that.matches(/^[\\w-]+\\.[\\w-]+\\.[\\w-]+$/);",
+                  "  pm.expect(body.user.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "  pm.expect(body.user.role).to.equal(\"CUSTOMER\");",
+                  "  pm.expect(body.user.email).to.equal(pm.variables.get(\"registrationEmail\").toLowerCase());",
+                  "  pm.expect(body.user).to.not.have.property(\"passwordHash\");",
+                  "  pm.expect(body.user.id).to.equal(pm.variables.get(\"registeredUserId\"));",
+                  "  if (pm.response.code === 200) pm.collectionVariables.set(\"customerToken\", body.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập STAFF (200)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"staffToken\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"JWT và tài khoản STAFF hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property(\"accessToken\").that.matches(/^[\\w-]+\\.[\\w-]+\\.[\\w-]+$/);",
+                  "  pm.expect(body.user.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "  pm.expect(body.user.role).to.equal(\"STAFF\");",
+                  "  pm.expect(body.user.email).to.equal(pm.variables.get(\"staffEmail\").trim().toLowerCase());",
+                  "  pm.expect(body.user).to.not.have.property(\"passwordHash\");",
+                  "  if (pm.response.code === 200) pm.collectionVariables.set(\"staffToken\", body.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{staffEmail}}\",\n  \"password\": \"{{staffPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập sai mật khẩu (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(401);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"PostmanWrong123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập email chưa đăng ký (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(401);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"unknown-{{registrationEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập thiếu mật khẩu (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message.some(message => message.includes(\"password\"))).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registrationEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 Danh mục sản phẩm",
+      "description": "Dùng danh mục từ prisma/seed.cjs và sản phẩm đã ẩn từ prisma/seed-postman.cjs.",
+      "item": [
+        {
+          "name": "Danh mục theo thứ tự hiển thị (200)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"coffeeCategoryId\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Danh mục hợp lệ và lấy ID danh mục Cà phê\", function () {",
+                  "  const categories = pm.response.json();",
+                  "  pm.expect(categories).to.be.an(\"array\").and.not.empty;",
+                  "  categories.forEach((category, index) => {",
+                  "    pm.expect(category.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(category.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(Number.isInteger(category.displayOrder)).to.equal(true);",
+                  "    if (index > 0) pm.expect(category.displayOrder).to.be.at.least(categories[index - 1].displayOrder);",
+                  "  });",
+                  "  const coffee = categories.find(category => category.name === \"Cà phê\");",
+                  "  pm.expect(coffee, \"Chạy seed danh mục\").to.be.an(\"object\");",
+                  "  if (pm.response.code === 200) pm.collectionVariables.set(\"coffeeCategoryId\", coffee.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Danh sách sản phẩm với phân trang mặc định (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trang 1 có cấu trúc và số lượng hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.include({ page: 1, pageSize: 20 });",
+                  "  pm.expect(body.total).to.be.at.least(0);",
+                  "  pm.expect(Number.isInteger(body.total)).to.equal(true);",
+                  "  pm.expect(body.items).to.be.an(\"array\").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));",
+                  "  body.items.forEach(product => {",
+                  "    pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(product.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(product.basePrice).to.be.at.least(0);",
+                  "    pm.expect(product.stockQuantity).to.be.at.least(0);",
+                  "    pm.expect(product.isAvailable).to.equal(true);",
+                  "    pm.expect(product.category.id).to.equal(product.categoryId);",
+                  "  });",
+                  "  pm.expect(body.items, \"Chạy seed danh mục\").to.not.be.empty;",
+                  "  const ids = body.items.map(product => product.id);",
+                  "  pm.expect(ids).to.not.include(pm.variables.get(\"hiddenProductId\"));",
+                  "  if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set(\"catalogPageOneIds\", JSON.stringify(ids));",
+                  "    pm.collectionVariables.set(\"catalogTotal\", String(body.total));",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Trang 2 không trùng sản phẩm với trang 1 (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trang 2 có cấu trúc và số lượng hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.include({ page: 2, pageSize: 20 });",
+                  "  pm.expect(body.total).to.be.at.least(0);",
+                  "  pm.expect(Number.isInteger(body.total)).to.equal(true);",
+                  "  pm.expect(body.items).to.be.an(\"array\").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));",
+                  "  body.items.forEach(product => {",
+                  "    pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(product.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(product.basePrice).to.be.at.least(0);",
+                  "    pm.expect(product.stockQuantity).to.be.at.least(0);",
+                  "    pm.expect(product.isAvailable).to.equal(true);",
+                  "    pm.expect(product.category.id).to.equal(product.categoryId);",
+                  "  });",
+                  "  const previousIds = JSON.parse(pm.variables.get(\"catalogPageOneIds\"));",
+                  "  const ids = body.items.map(product => product.id);",
+                  "  pm.expect(body.total).to.equal(Number(pm.variables.get(\"catalogTotal\")));",
+                  "  pm.expect(ids.some(id => previousIds.includes(id))).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lọc theo danh mục Cà phê (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trang 1 có cấu trúc và số lượng hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.include({ page: 1, pageSize: 20 });",
+                  "  pm.expect(body.total).to.be.at.least(0);",
+                  "  pm.expect(Number.isInteger(body.total)).to.equal(true);",
+                  "  pm.expect(body.items).to.be.an(\"array\").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));",
+                  "  body.items.forEach(product => {",
+                  "    pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(product.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(product.basePrice).to.be.at.least(0);",
+                  "    pm.expect(product.stockQuantity).to.be.at.least(0);",
+                  "    pm.expect(product.isAvailable).to.equal(true);",
+                  "    pm.expect(product.category.id).to.equal(product.categoryId);",
+                  "  });",
+                  "  const categoryId = pm.variables.get(\"coffeeCategoryId\");",
+                  "  pm.expect(body.items).to.not.be.empty;",
+                  "  body.items.forEach(product => pm.expect(product.categoryId).to.equal(categoryId));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?categoryId={{coffeeCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "{{coffeeCategoryId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tìm tiếng Việt không dấu, không phân biệt hoa thường (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trang 1 có cấu trúc và số lượng hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.include({ page: 1, pageSize: 20 });",
+                  "  pm.expect(body.total).to.be.at.least(0);",
+                  "  pm.expect(Number.isInteger(body.total)).to.equal(true);",
+                  "  pm.expect(body.items).to.be.an(\"array\").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));",
+                  "  body.items.forEach(product => {",
+                  "    pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(product.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(product.basePrice).to.be.at.least(0);",
+                  "    pm.expect(product.stockQuantity).to.be.at.least(0);",
+                  "    pm.expect(product.isAvailable).to.equal(true);",
+                  "    pm.expect(product.category.id).to.equal(product.categoryId);",
+                  "  });",
+                  "  pm.expect(body.items.map(product => product.name)).to.include(\"Trà đào cam sả\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?q=%20%20TRA%20DAO%20CAM%20SA%20%20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "%20%20TRA%20DAO%20CAM%20SA%20%20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Kết hợp danh mục và tìm kiếm theo tên (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trang 1 có cấu trúc và số lượng hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.include({ page: 1, pageSize: 20 });",
+                  "  pm.expect(body.total).to.be.at.least(0);",
+                  "  pm.expect(Number.isInteger(body.total)).to.equal(true);",
+                  "  pm.expect(body.items).to.be.an(\"array\").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));",
+                  "  body.items.forEach(product => {",
+                  "    pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(product.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(product.basePrice).to.be.at.least(0);",
+                  "    pm.expect(product.stockQuantity).to.be.at.least(0);",
+                  "    pm.expect(product.isAvailable).to.equal(true);",
+                  "    pm.expect(product.category.id).to.equal(product.categoryId);",
+                  "  });",
+                  "  const categoryId = pm.variables.get(\"coffeeCategoryId\");",
+                  "  pm.expect(body.items.map(product => product.id)).to.include(pm.variables.get(\"catalogProductId\"));",
+                  "  body.items.forEach(product => pm.expect(product.categoryId).to.equal(categoryId));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?categoryId={{coffeeCategoryId}}&q=ca%20phe%20sua%20da",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "{{coffeeCategoryId}}"
+                },
+                {
+                  "key": "q",
+                  "value": "ca%20phe%20sua%20da"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tìm kiếm không có kết quả (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trang 1 có cấu trúc và số lượng hợp lệ\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.include({ page: 1, pageSize: 20 });",
+                  "  pm.expect(body.total).to.be.at.least(0);",
+                  "  pm.expect(Number.isInteger(body.total)).to.equal(true);",
+                  "  pm.expect(body.items).to.be.an(\"array\").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));",
+                  "  body.items.forEach(product => {",
+                  "    pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(product.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(product.basePrice).to.be.at.least(0);",
+                  "    pm.expect(product.stockQuantity).to.be.at.least(0);",
+                  "    pm.expect(product.isAvailable).to.equal(true);",
+                  "    pm.expect(product.category.id).to.equal(product.categoryId);",
+                  "  });",
+                  "  pm.expect(body.total).to.equal(0);",
+                  "  pm.expect(body.items).to.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?q=postman-no-product-1fa6571e",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "postman-no-product-1fa6571e"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Từ chối page bằng 0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Từ chối page không phải số nguyên (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1.5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1.5"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Chi tiết sản phẩm có size và topping (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Sản phẩm, danh mục, size và topping mẫu đúng dữ liệu\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.include({ id: pm.variables.get(\"catalogProductId\"), name: \"Cà phê sữa đá\", basePrice: 30000, isAvailable: true });",
+                  "  pm.expect(body.category.id).to.equal(body.categoryId);",
+                  "  pm.expect(body.sizes.map(size => ({ name: size.name, extraPrice: size.extraPrice }))).to.deep.equal([",
+                  "    { name: \"S\", extraPrice: 0 }, { name: \"M\", extraPrice: 5000 }, { name: \"L\", extraPrice: 10000 },",
+                  "  ]);",
+                  "  pm.expect(body.toppings.map(topping => topping.name)).to.have.members([\"Trân châu trắng\", \"Thạch cà phê\"]);",
+                  "  [...body.sizes, ...body.toppings].forEach(option => {",
+                  "    pm.expect(option.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(option.extraPrice).to.be.at.least(0);",
+                  "    pm.expect(option.isAvailable).to.equal(true);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{catalogProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{catalogProductId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Từ chối ID sản phẩm sai định dạng (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/not-a-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "not-a-uuid"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sản phẩm đã ẩn (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(404);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{hiddenProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{hiddenProductId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sản phẩm không tồn tại (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(404);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{missingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{missingId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 Đơn hàng nhân viên",
+      "description": "Đăng nhập CUSTOMER và STAFF ở thư mục 02. Request đầu tiên tạo một đơn PAID và một đơn PENDING_PAYMENT riêng cho mỗi lượt chạy.",
+      "item": [
+        {
+          "name": "Tạo đơn mẫu cho lượt chạy (201)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"paidOrderId\");",
+                  "pm.collectionVariables.unset(\"pendingOrderId\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let fixture;",
+                  "let ready = false;",
+                  "pm.test(\"Tạo hai đơn mẫu mới cho lượt chạy (201)\", function () {",
+                  "  pm.expect(pm.response.code, \"Bật POSTMAN_FIXTURES_ENABLED và seed dữ liệu mẫu theo README\").to.equal(201);",
+                  "  fixture = pm.response.json();",
+                  "  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "  pm.expect(fixture.paidOrder.status).to.equal(\"PAID\");",
+                  "  pm.expect(fixture.pendingOrder.status).to.equal(\"PENDING_PAYMENT\");",
+                  "  pm.expect(fixture.paidOrder.id).to.match(uuid);",
+                  "  pm.expect(fixture.pendingOrder.id).to.match(uuid);",
+                  "  pm.expect(fixture.pendingOrder.id).to.not.equal(fixture.paidOrder.id);",
+                  "  ready = true;",
+                  "});",
+                  "if (ready) {",
+                  "  pm.collectionVariables.set(\"paidOrderId\", fixture.paidOrder.id);",
+                  "  pm.collectionVariables.set(\"pendingOrderId\", fixture.pendingOrder.id);",
+                  "} else {",
+                  "  pm.execution.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/_test/postman/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_test",
+                "postman",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Danh sách đơn thiếu JWT (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(401);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Danh sách đơn với JWT sai (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(401);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "not-a-jwt",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CUSTOMER không được xem danh sách nhân viên (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(403);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cập nhật trạng thái thiếu JWT (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(401);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CUSTOMER không được cập nhật đơn (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(403);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "STAFF thấy đơn PAID và không thấy đơn chưa thanh toán (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Danh sách chỉ có đơn đang xử lý và sắp theo thời gian tăng dần\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const active = [\"PAID\", \"PREPARING\", \"READY\"];",
+                  "  pm.expect(orders).to.be.an(\"array\").with.lengthOf.at.most(100);",
+                  "  orders.forEach((order, index) => {",
+                  "    pm.expect(active).to.include(order.status);",
+                  "    pm.expect(order.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(order.items).to.be.an(\"array\");",
+                  "    order.items.forEach(item => pm.expect(item.toppings).to.be.an(\"array\"));",
+                  "    const time = Date.parse(order.createdAt);",
+                  "    pm.expect(Number.isNaN(time)).to.equal(false);",
+                  "    if (index > 0) pm.expect(time).to.be.at.least(Date.parse(orders[index - 1].createdAt));",
+                  "  });",
+                  "});",
+                  "pm.test(\"Đơn fixture xuất hiện trong hàng đợi với trạng thái PAID\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const order = orders.find(entry => entry.id === pm.variables.get(\"paidOrderId\"));",
+                  "  pm.expect(orders.some(entry => entry.id === pm.variables.get(\"pendingOrderId\"))).to.equal(false);",
+                  "  pm.expect(order, \"Đơn mẫu của lượt hiện tại phải có trong hàng đợi\").to.be.an(\"object\");",
+                  "  pm.expect(order.status).to.equal(\"PAID\");",
+                  "  pm.expect(order.items).to.have.lengthOf(1);",
+                  "  pm.expect(order.items[0].toppings).to.have.lengthOf(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ID đơn sai định dạng (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/not-a-uuid/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "not-a-uuid",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đơn không tồn tại (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(404);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{missingId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{missingId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Thiếu trường status (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message.some(message => message.startsWith(\"status \"))).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Trạng thái đích không có trong enum (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message.some(message => message.startsWith(\"status \"))).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INVALID_STATUS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "expectedStatus sai định dạng (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message.some(message => message.startsWith(\"expectedStatus \"))).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"INVALID_STATUS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Đơn chưa thanh toán không thể chuyển sang PREPARING (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message).to.include(\"PENDING_PAYMENT\");",
+                  "  pm.expect(body.message).to.include(\"PREPARING\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{pendingOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{pendingOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"PENDING_PAYMENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PAID không thể bỏ qua PREPARING để sang READY (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message).to.include(\"PAID\");",
+                  "  pm.expect(body.message).to.include(\"READY\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"READY\",\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PAID → PREPARING (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cập nhật đúng đơn và giữ nguyên dữ liệu món, topping và thanh toán\", function () {",
+                  "  const order = pm.response.json();",
+                  "  pm.expect(order).to.include({ id: pm.variables.get(\"paidOrderId\"), status: \"PREPARING\" });",
+                  "  pm.expect(order.items).to.have.lengthOf(1);",
+                  "  const item = order.items[0];",
+                  "  pm.expect(item.productId).to.equal(pm.variables.get(\"catalogProductId\"));",
+                  "  pm.expect(item).to.include({ orderId: order.id, productName: \"Cà phê sữa đá\", sizeName: \"S\", quantity: 1 });",
+                  "  pm.expect(item.lineTotal).to.equal(item.unitPrice * item.quantity);",
+                  "  pm.expect(item.lineTotal).to.equal(order.subtotal);",
+                  "  pm.expect(item.toppings).to.have.lengthOf(1);",
+                  "  pm.expect(item.toppings[0].extraPrice).to.be.above(0);",
+                  "  pm.expect(order.totalAmount).to.equal(order.subtotal - order.discountAmount);",
+                  "  pm.expect(order.payments).to.have.lengthOf(1);",
+                  "  pm.expect(order.payments[0]).to.include({ orderId: order.id, status: \"SUCCESS\", method: \"WALLET\", amount: order.totalAmount });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "STAFF thấy đơn PREPARING (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Danh sách chỉ có đơn đang xử lý và sắp theo thời gian tăng dần\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const active = [\"PAID\", \"PREPARING\", \"READY\"];",
+                  "  pm.expect(orders).to.be.an(\"array\").with.lengthOf.at.most(100);",
+                  "  orders.forEach((order, index) => {",
+                  "    pm.expect(active).to.include(order.status);",
+                  "    pm.expect(order.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(order.items).to.be.an(\"array\");",
+                  "    order.items.forEach(item => pm.expect(item.toppings).to.be.an(\"array\"));",
+                  "    const time = Date.parse(order.createdAt);",
+                  "    pm.expect(Number.isNaN(time)).to.equal(false);",
+                  "    if (index > 0) pm.expect(time).to.be.at.least(Date.parse(orders[index - 1].createdAt));",
+                  "  });",
+                  "});",
+                  "pm.test(\"Đơn fixture xuất hiện trong hàng đợi với trạng thái PREPARING\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const order = orders.find(entry => entry.id === pm.variables.get(\"paidOrderId\"));",
+                  "  pm.expect(orders.some(entry => entry.id === pm.variables.get(\"pendingOrderId\"))).to.equal(false);",
+                  "  pm.expect(order, \"Đơn mẫu của lượt hiện tại phải có trong hàng đợi\").to.be.an(\"object\");",
+                  "  pm.expect(order.status).to.equal(\"PREPARING\");",
+                  "  pm.expect(order.items).to.have.lengthOf(1);",
+                  "  pm.expect(order.items[0].toppings).to.have.lengthOf(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "expectedStatus đã cũ sau khi cập nhật (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(409);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"READY\",\n  \"expectedStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PREPARING → READY (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cập nhật đúng đơn và giữ nguyên dữ liệu món, topping và thanh toán\", function () {",
+                  "  const order = pm.response.json();",
+                  "  pm.expect(order).to.include({ id: pm.variables.get(\"paidOrderId\"), status: \"READY\" });",
+                  "  pm.expect(order.items).to.have.lengthOf(1);",
+                  "  const item = order.items[0];",
+                  "  pm.expect(item.productId).to.equal(pm.variables.get(\"catalogProductId\"));",
+                  "  pm.expect(item).to.include({ orderId: order.id, productName: \"Cà phê sữa đá\", sizeName: \"S\", quantity: 1 });",
+                  "  pm.expect(item.lineTotal).to.equal(item.unitPrice * item.quantity);",
+                  "  pm.expect(item.lineTotal).to.equal(order.subtotal);",
+                  "  pm.expect(item.toppings).to.have.lengthOf(1);",
+                  "  pm.expect(item.toppings[0].extraPrice).to.be.above(0);",
+                  "  pm.expect(order.totalAmount).to.equal(order.subtotal - order.discountAmount);",
+                  "  pm.expect(order.payments).to.have.lengthOf(1);",
+                  "  pm.expect(order.payments[0]).to.include({ orderId: order.id, status: \"SUCCESS\", method: \"WALLET\", amount: order.totalAmount });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"READY\",\n  \"expectedStatus\": \"PREPARING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "STAFF thấy đơn READY (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Danh sách chỉ có đơn đang xử lý và sắp theo thời gian tăng dần\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const active = [\"PAID\", \"PREPARING\", \"READY\"];",
+                  "  pm.expect(orders).to.be.an(\"array\").with.lengthOf.at.most(100);",
+                  "  orders.forEach((order, index) => {",
+                  "    pm.expect(active).to.include(order.status);",
+                  "    pm.expect(order.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(order.items).to.be.an(\"array\");",
+                  "    order.items.forEach(item => pm.expect(item.toppings).to.be.an(\"array\"));",
+                  "    const time = Date.parse(order.createdAt);",
+                  "    pm.expect(Number.isNaN(time)).to.equal(false);",
+                  "    if (index > 0) pm.expect(time).to.be.at.least(Date.parse(orders[index - 1].createdAt));",
+                  "  });",
+                  "});",
+                  "pm.test(\"Đơn fixture xuất hiện trong hàng đợi với trạng thái READY\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const order = orders.find(entry => entry.id === pm.variables.get(\"paidOrderId\"));",
+                  "  pm.expect(orders.some(entry => entry.id === pm.variables.get(\"pendingOrderId\"))).to.equal(false);",
+                  "  pm.expect(order, \"Đơn mẫu của lượt hiện tại phải có trong hàng đợi\").to.be.an(\"object\");",
+                  "  pm.expect(order.status).to.equal(\"READY\");",
+                  "  pm.expect(order.items).to.have.lengthOf(1);",
+                  "  pm.expect(order.items[0].toppings).to.have.lengthOf(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "READY → COMPLETED với expectedStatus bỏ trống (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cập nhật đúng đơn và giữ nguyên dữ liệu món, topping và thanh toán\", function () {",
+                  "  const order = pm.response.json();",
+                  "  pm.expect(order).to.include({ id: pm.variables.get(\"paidOrderId\"), status: \"COMPLETED\" });",
+                  "  pm.expect(order.items).to.have.lengthOf(1);",
+                  "  const item = order.items[0];",
+                  "  pm.expect(item.productId).to.equal(pm.variables.get(\"catalogProductId\"));",
+                  "  pm.expect(item).to.include({ orderId: order.id, productName: \"Cà phê sữa đá\", sizeName: \"S\", quantity: 1 });",
+                  "  pm.expect(item.lineTotal).to.equal(item.unitPrice * item.quantity);",
+                  "  pm.expect(item.lineTotal).to.equal(order.subtotal);",
+                  "  pm.expect(item.toppings).to.have.lengthOf(1);",
+                  "  pm.expect(item.toppings[0].extraPrice).to.be.above(0);",
+                  "  pm.expect(order.totalAmount).to.equal(order.subtotal - order.discountAmount);",
+                  "  pm.expect(order.payments).to.have.lengthOf(1);",
+                  "  pm.expect(order.payments[0]).to.include({ orderId: order.id, status: \"SUCCESS\", method: \"WALLET\", amount: order.totalAmount });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "COMPLETED không thể quay lại PREPARING (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Phản hồi lỗi có cấu trúc NestJS\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.statusCode).to.equal(400);",
+                  "  pm.expect(body.message).to.satisfy(value => typeof value === \"string\" || (Array.isArray(value) && value.length > 0));",
+                  "  pm.expect(body.message).to.include(\"COMPLETED\");",
+                  "  pm.expect(body.message).to.include(\"PREPARING\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{paidOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{paidOrderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\",\n  \"expectedStatus\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "STAFF không còn thấy đơn COMPLETED (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Danh sách chỉ có đơn đang xử lý và sắp theo thời gian tăng dần\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const active = [\"PAID\", \"PREPARING\", \"READY\"];",
+                  "  pm.expect(orders).to.be.an(\"array\").with.lengthOf.at.most(100);",
+                  "  orders.forEach((order, index) => {",
+                  "    pm.expect(active).to.include(order.status);",
+                  "    pm.expect(order.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "    pm.expect(order.items).to.be.an(\"array\");",
+                  "    order.items.forEach(item => pm.expect(item.toppings).to.be.an(\"array\"));",
+                  "    const time = Date.parse(order.createdAt);",
+                  "    pm.expect(Number.isNaN(time)).to.equal(false);",
+                  "    if (index > 0) pm.expect(time).to.be.at.least(Date.parse(orders[index - 1].createdAt));",
+                  "  });",
+                  "});",
+                  "pm.test(\"Đơn COMPLETED và PENDING_PAYMENT không nằm trong hàng đợi\", function () {",
+                  "  const orders = pm.response.json();",
+                  "  const order = orders.find(entry => entry.id === pm.variables.get(\"paidOrderId\"));",
+                  "  pm.expect(orders.some(entry => entry.id === pm.variables.get(\"pendingOrderId\"))).to.equal(false);",
+                  "  pm.expect(order).to.equal(undefined);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:4001",
+      "type": "string",
+      "description": "URL gốc của API BrewLite."
+    },
+    {
+      "key": "expectDatabaseDown",
+      "value": "false",
+      "type": "string",
+      "description": "Đặt true để chạy riêng kiểm tra readiness khi PostgreSQL ngắt."
+    },
+    {
+      "key": "staffEmail",
+      "value": "staff@brewlite.local",
+      "type": "string",
+      "description": "Email STAFF mẫu từ seed-users.cjs."
+    },
+    {
+      "key": "staffPassword",
+      "value": "BrewLiteStaff123!",
+      "type": "string",
+      "description": "Mật khẩu STAFF mẫu cho môi trường local."
+    },
+    {
+      "key": "customerPassword",
+      "value": "BrewLite123!",
+      "type": "string",
+      "description": "Mật khẩu của CUSTOMER tạo trong mỗi lần chạy."
+    },
+    {
+      "key": "catalogProductId",
+      "value": "10000000-0000-4000-8000-000000000001",
+      "type": "string",
+      "description": "ID Cà phê sữa đá từ seed.cjs."
+    },
+    {
+      "key": "hiddenProductId",
+      "value": "a2000000-0000-4000-8000-000000000001",
+      "type": "string",
+      "description": "ID sản phẩm đã ẩn từ seed-postman.cjs."
+    },
+    {
+      "key": "paidOrderId",
+      "value": "",
+      "type": "string",
+      "description": "ID nhận từ request tạo đơn mẫu cho lượt chạy."
+    },
+    {
+      "key": "pendingOrderId",
+      "value": "",
+      "type": "string",
+      "description": "ID nhận từ request tạo đơn mẫu cho lượt chạy."
+    },
+    {
+      "key": "missingId",
+      "value": "f0000000-0000-4000-8000-000000000001",
+      "type": "string",
+      "description": "UUID hợp lệ dành cho ca kiểm tra 404."
+    },
+    {
+      "key": "registrationEmail",
+      "value": "",
+      "type": "string",
+      "description": "Email tạo tự động ở request đăng ký."
+    },
+    {
+      "key": "registeredUserId",
+      "value": "",
+      "type": "string",
+      "description": "ID tài khoản nhận từ request đăng ký."
+    },
+    {
+      "key": "customerToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT lấy từ request đăng nhập CUSTOMER."
+    },
+    {
+      "key": "staffToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT lấy từ request đăng nhập STAFF."
+    },
+    {
+      "key": "coffeeCategoryId",
+      "value": "",
+      "type": "string",
+      "description": "ID danh mục Cà phê nhận từ GET /categories."
+    },
+    {
+      "key": "catalogPageOneIds",
+      "value": "",
+      "type": "string",
+      "description": "Danh sách ID của trang sản phẩm đầu tiên."
+    },
+    {
+      "key": "catalogTotal",
+      "value": "",
+      "type": "string",
+      "description": "Tổng sản phẩm nhận từ trang đầu tiên."
+    }
+  ]
+}

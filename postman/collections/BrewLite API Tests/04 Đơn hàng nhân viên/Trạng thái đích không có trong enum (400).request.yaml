@@ -1,0 +1,29 @@
+$kind: http-request
+url: "{{baseUrl}}/orders/{{paidOrderId}}/status"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "INVALID_STATUS"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{staffToken}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 400", function () {
+        pm.response.to.have.status(400);
+      });
+      pm.test("Phản hồi lỗi có cấu trúc NestJS", function () {
+        const body = pm.response.json();
+        pm.expect(body.statusCode).to.equal(400);
+        pm.expect(body.message).to.satisfy(value => typeof value === "string" || (Array.isArray(value) && value.length > 0));
+        pm.expect(body.message.some(message => message.startsWith("status "))).to.equal(true);
+      });
+    language: text/javascript
+order: 10000

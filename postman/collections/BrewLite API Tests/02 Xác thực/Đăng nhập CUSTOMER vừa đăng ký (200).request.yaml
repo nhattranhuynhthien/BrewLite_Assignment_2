@@ -1,0 +1,33 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{registrationEmail}}",
+      "password": "{{customerPassword}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: pm.collectionVariables.unset("customerToken");
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("JWT và tài khoản CUSTOMER hợp lệ", function () {
+        const body = pm.response.json();
+        pm.expect(body).to.have.property("accessToken").that.matches(/^[\w-]+\.[\w-]+\.[\w-]+$/);
+        pm.expect(body.user.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        pm.expect(body.user.role).to.equal("CUSTOMER");
+        pm.expect(body.user.email).to.equal(pm.variables.get("registrationEmail").toLowerCase());
+        pm.expect(body.user).to.not.have.property("passwordHash");
+        pm.expect(body.user.id).to.equal(pm.variables.get("registeredUserId"));
+        if (pm.response.code === 200) pm.collectionVariables.set("customerToken", body.accessToken);
+      });
+    language: text/javascript
+order: 5000

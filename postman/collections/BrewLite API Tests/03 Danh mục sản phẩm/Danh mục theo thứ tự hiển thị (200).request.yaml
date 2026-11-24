@@ -1,0 +1,27 @@
+$kind: http-request
+url: "{{baseUrl}}/categories"
+method: GET
+scripts:
+  - type: beforeRequest
+    code: pm.collectionVariables.unset("coffeeCategoryId");
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Danh mục hợp lệ và lấy ID danh mục Cà phê", function () {
+        const categories = pm.response.json();
+        pm.expect(categories).to.be.an("array").and.not.empty;
+        categories.forEach((category, index) => {
+          pm.expect(category.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+          pm.expect(category.name).to.be.a("string").and.not.empty;
+          pm.expect(Number.isInteger(category.displayOrder)).to.equal(true);
+          if (index > 0) pm.expect(category.displayOrder).to.be.at.least(categories[index - 1].displayOrder);
+        });
+        const coffee = categories.find(category => category.name === "Cà phê");
+        pm.expect(coffee, "Chạy seed danh mục").to.be.an("object");
+        if (pm.response.code === 200) pm.collectionVariables.set("coffeeCategoryId", coffee.id);
+      });
+    language: text/javascript
+order: 1000

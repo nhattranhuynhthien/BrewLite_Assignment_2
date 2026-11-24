@@ -1,0 +1,22 @@
+$kind: http-request
+description: Mặc định kiểm tra PostgreSQL đang hoạt động. Đặt expectDatabaseDown=true và gửi riêng request này để kiểm tra 503 khi API còn chạy nhưng PostgreSQL đã ngắt.
+url: "{{baseUrl}}/health"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      const databaseDown = pm.variables.get("expectDatabaseDown") === "true";
+      const expectedCode = databaseDown ? 503 : 200;
+      pm.test("HTTP khớp trạng thái PostgreSQL mong đợi", function () {
+        pm.response.to.have.status(expectedCode);
+      });
+      pm.test("Trạng thái dịch vụ, PostgreSQL và timestamp khớp với readiness", function () {
+        const body = pm.response.json();
+        pm.expect(body.service).to.equal("brewlite-api");
+        pm.expect(body.status).to.equal(databaseDown ? "error" : "ok");
+        pm.expect(body.database).to.equal(databaseDown ? "down" : "up");
+        pm.expect(body.timestamp).to.be.a("string");
+        pm.expect(Number.isNaN(Date.parse(body.timestamp))).to.equal(false);
+      });
+    language: text/javascript
+order: 2000

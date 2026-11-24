@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{baseUrl}}/docs-json"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("OpenAPI có đủ endpoint nghiệp vụ đã triển khai", function () {
+        const body = pm.response.json();
+        pm.expect(body.openapi).to.match(/^3\./);
+        pm.expect(body.info.title).to.equal("BrewLite API");
+        const routes = {"/health/live":"get","/health":"get","/auth/register":"post","/auth/login":"post","/categories":"get","/products":"get","/products/{id}":"get","/staff/orders":"get","/orders/{id}/status":"patch"};
+        Object.entries(routes).forEach(([path, method]) => {
+          pm.expect(body.paths, path).to.have.property(path);
+          pm.expect(body.paths[path], method + " " + path).to.have.property(method);
+        });
+      });
+    language: text/javascript
+order: 3000

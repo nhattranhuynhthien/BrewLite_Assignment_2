@@ -1,0 +1,38 @@
+$kind: http-request
+url: "{{baseUrl}}/staff/orders"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{staffToken}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Danh sách chỉ có đơn đang xử lý và sắp theo thời gian tăng dần", function () {
+        const orders = pm.response.json();
+        const active = ["PAID", "PREPARING", "READY"];
+        pm.expect(orders).to.be.an("array").with.lengthOf.at.most(100);
+        orders.forEach((order, index) => {
+          pm.expect(active).to.include(order.status);
+          pm.expect(order.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+          pm.expect(order.items).to.be.an("array");
+          order.items.forEach(item => pm.expect(item.toppings).to.be.an("array"));
+          const time = Date.parse(order.createdAt);
+          pm.expect(Number.isNaN(time)).to.equal(false);
+          if (index > 0) pm.expect(time).to.be.at.least(Date.parse(orders[index - 1].createdAt));
+        });
+      });
+      pm.test("Đơn fixture xuất hiện trong hàng đợi với trạng thái READY", function () {
+        const orders = pm.response.json();
+        const order = orders.find(entry => entry.id === pm.variables.get("paidOrderId"));
+        pm.expect(orders.some(entry => entry.id === pm.variables.get("pendingOrderId"))).to.equal(false);
+        pm.expect(order, "Đơn mẫu của lượt hiện tại phải có trong hàng đợi").to.be.an("object");
+        pm.expect(order.status).to.equal("READY");
+        pm.expect(order.items).to.have.lengthOf(1);
+        pm.expect(order.items[0].toppings).to.have.lengthOf(1);
+      });
+    language: text/javascript
+order: 18000

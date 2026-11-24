@@ -1,0 +1,15 @@
+# Use this workspace to collaborate
+workspace:
+  id: 27cf22eb-f556-4ea0-8cf0-b7e97567133b
+
+localResources:
+  collections:
+    - ../docs/postman/BrewLite.postman_collection.json
+  environments:
+    - ../docs/postman/BrewLite.local.postman_environment.json
+  specs:
+    - ../docs/api-contract.yaml
+
+cloudResources:
+  collections:
+    ../postman/collections/BrewLite API Tests: 3ff90d9c-1b30-485f-aa4b-43c6814035cf

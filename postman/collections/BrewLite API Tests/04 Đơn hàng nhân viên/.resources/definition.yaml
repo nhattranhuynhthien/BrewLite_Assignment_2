@@ -1,0 +1,3 @@
+$kind: collection
+description: Đăng nhập CUSTOMER và STAFF ở thư mục 02. Request đầu tiên tạo một đơn PAID và một đơn PENDING_PAYMENT riêng cho mỗi lượt chạy.
+order: 4000

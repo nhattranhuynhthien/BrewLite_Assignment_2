@@ -39,6 +39,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-replace_with_your_local_jwt_secret_key_min_32_chars}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       SEED_DEMO_USERS: ${SEED_DEMO_USERS:-true}
+      POSTMAN_FIXTURES_ENABLED: ${POSTMAN_FIXTURES_ENABLED:-false}
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-replace_with_your_local_webhook_secret}
       PAYMENT_TIMEOUT_MS: ${PAYMENT_TIMEOUT_MS:-5000}
