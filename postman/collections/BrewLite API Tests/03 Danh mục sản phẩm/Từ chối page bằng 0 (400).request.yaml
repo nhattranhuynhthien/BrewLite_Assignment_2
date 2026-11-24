@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/products?page=0"
+method: GET
+queryParams:
+  page: "0"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 400", function () {
+        pm.response.to.have.status(400);
+      });
+      pm.test("Phản hồi lỗi có cấu trúc NestJS", function () {
+        const body = pm.response.json();
+        pm.expect(body.statusCode).to.equal(400);
+        pm.expect(body.message).to.satisfy(value => typeof value === "string" || (Array.isArray(value) && value.length > 0));
+      });
+    language: text/javascript
+order: 8000

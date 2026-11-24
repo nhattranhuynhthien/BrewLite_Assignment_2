@@ -1,0 +1,32 @@
+$kind: http-request
+url: "{{baseUrl}}/products?categoryId={{coffeeCategoryId}}&q=ca%20phe%20sua%20da"
+method: GET
+queryParams:
+  categoryId: "{{coffeeCategoryId}}"
+  q: ca%20phe%20sua%20da
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Trang 1 có cấu trúc và số lượng hợp lệ", function () {
+        const body = pm.response.json();
+        pm.expect(body).to.include({ page: 1, pageSize: 20 });
+        pm.expect(body.total).to.be.at.least(0);
+        pm.expect(Number.isInteger(body.total)).to.equal(true);
+        pm.expect(body.items).to.be.an("array").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));
+        body.items.forEach(product => {
+          pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+          pm.expect(product.name).to.be.a("string").and.not.empty;
+          pm.expect(product.basePrice).to.be.at.least(0);
+          pm.expect(product.stockQuantity).to.be.at.least(0);
+          pm.expect(product.isAvailable).to.equal(true);
+          pm.expect(product.category.id).to.equal(product.categoryId);
+        });
+        const categoryId = pm.variables.get("coffeeCategoryId");
+        pm.expect(body.items.map(product => product.id)).to.include(pm.variables.get("catalogProductId"));
+        body.items.forEach(product => pm.expect(product.categoryId).to.equal(categoryId));
+      });
+    language: text/javascript
+order: 6000

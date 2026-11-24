@@ -1,0 +1,3 @@
+$kind: collection
+description: Đăng ký tạo email mới mỗi lần chạy. Login lưu JWT vào biến collection để các request phân quyền sử dụng.
+order: 2000

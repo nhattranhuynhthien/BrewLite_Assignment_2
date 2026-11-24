@@ -1,0 +1,38 @@
+$kind: http-request
+url: "{{baseUrl}}/orders/{{paidOrderId}}/status"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "COMPLETED"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{staffToken}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Cập nhật đúng đơn và giữ nguyên dữ liệu món, topping và thanh toán", function () {
+        const order = pm.response.json();
+        pm.expect(order).to.include({ id: pm.variables.get("paidOrderId"), status: "COMPLETED" });
+        pm.expect(order.items).to.have.lengthOf(1);
+        const item = order.items[0];
+        pm.expect(item.productId).to.equal(pm.variables.get("catalogProductId"));
+        pm.expect(item).to.include({ orderId: order.id, productName: "Cà phê sữa đá", sizeName: "S", quantity: 1 });
+        pm.expect(item.lineTotal).to.equal(item.unitPrice * item.quantity);
+        pm.expect(item.lineTotal).to.equal(order.subtotal);
+        pm.expect(item.toppings).to.have.lengthOf(1);
+        pm.expect(item.toppings[0].extraPrice).to.be.above(0);
+        pm.expect(order.totalAmount).to.equal(order.subtotal - order.discountAmount);
+        pm.expect(order.payments).to.have.lengthOf(1);
+        pm.expect(order.payments[0]).to.include({ orderId: order.id, status: "SUCCESS", method: "WALLET", amount: order.totalAmount });
+      });
+    language: text/javascript
+order: 19000

@@ -1,0 +1,20 @@
+$kind: collection
+description: "Kiểm thử API BrewLite hiện có trong source: health, auth, catalog và xử lý đơn hàng của nhân viên. Seed danh mục và tài khoản mẫu một lần, sau đó collection tự tạo đơn mẫu cho mỗi lượt chạy. Xem docs/postman/README.md."
+variables:
+  baseUrl: http://127.0.0.1:4001
+  expectDatabaseDown: "false"
+  staffEmail: staff@brewlite.local
+  staffPassword: BrewLiteStaff123!
+  customerPassword: BrewLite123!
+  catalogProductId: 10000000-0000-4000-8000-000000000001
+  hiddenProductId: a2000000-0000-4000-8000-000000000001
+  paidOrderId: ""
+  pendingOrderId: ""
+  missingId: f0000000-0000-4000-8000-000000000001
+  registrationEmail: ""
+  registeredUserId: ""
+  customerToken: ""
+  staffToken: ""
+  coffeeCategoryId: ""
+  catalogPageOneIds: ""
+  catalogTotal: ""

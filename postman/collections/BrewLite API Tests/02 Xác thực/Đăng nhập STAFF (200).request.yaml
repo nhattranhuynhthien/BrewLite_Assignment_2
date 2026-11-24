@@ -1,0 +1,32 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{staffEmail}}",
+      "password": "{{staffPassword}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: pm.collectionVariables.unset("staffToken");
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("JWT và tài khoản STAFF hợp lệ", function () {
+        const body = pm.response.json();
+        pm.expect(body).to.have.property("accessToken").that.matches(/^[\w-]+\.[\w-]+\.[\w-]+$/);
+        pm.expect(body.user.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        pm.expect(body.user.role).to.equal("STAFF");
+        pm.expect(body.user.email).to.equal(pm.variables.get("staffEmail").trim().toLowerCase());
+        pm.expect(body.user).to.not.have.property("passwordHash");
+        if (pm.response.code === 200) pm.collectionVariables.set("staffToken", body.accessToken);
+      });
+    language: text/javascript
+order: 6000

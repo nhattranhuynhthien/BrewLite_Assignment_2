@@ -1,0 +1,35 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{registrationEmail}}",
+      "fullName": "  Postman Customer  ",
+      "password": "{{customerPassword}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      pm.collectionVariables.unset("registeredUserId");
+      const guid = pm.variables.replaceIn("{{$guid}}");
+      pm.collectionVariables.set("registrationEmail", "Postman-" + guid + "@example.test");
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 201", function () {
+        pm.response.to.have.status(201);
+      });
+      pm.test("Tài khoản mới đúng dữ liệu, mặc định CUSTOMER", function () {
+        const body = pm.response.json();
+        pm.expect(body.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        pm.expect(body.email).to.equal(pm.variables.get("registrationEmail").toLowerCase());
+        pm.expect(body).to.include({ fullName: "Postman Customer", role: "CUSTOMER" });
+        pm.expect(body).to.not.have.property("passwordHash");
+        if (pm.response.code === 201) pm.collectionVariables.set("registeredUserId", body.id);
+      });
+    language: text/javascript
+order: 1000

@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{baseUrl}}/health/live"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      let body;
+      try { body = pm.response.json(); } catch {}
+      if (pm.response.code !== 200 || body?.service !== "brewlite-api") {
+        pm.execution.setNextRequest(null);
+      }
+      pm.test("baseUrl trỏ tới API BrewLite và liveness trả timestamp hợp lệ", function () {
+        pm.expect(body, "Kiểm tra baseUrl và chạy API từ source hiện tại").to.be.an("object");
+        pm.expect(body.service, "Kiểm tra baseUrl và phiên bản API đang chạy").to.equal("brewlite-api");
+        pm.expect(body.status).to.equal("ok");
+        pm.expect(body.timestamp).to.be.a("string");
+        pm.expect(Number.isNaN(Date.parse(body.timestamp))).to.equal(false);
+      });
+    language: text/javascript
+order: 1000

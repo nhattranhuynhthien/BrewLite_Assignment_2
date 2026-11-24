@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/staff/orders"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: not-a-jwt
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 401", function () {
+        pm.response.to.have.status(401);
+      });
+      pm.test("Phản hồi lỗi có cấu trúc NestJS", function () {
+        const body = pm.response.json();
+        pm.expect(body.statusCode).to.equal(401);
+        pm.expect(body.message).to.satisfy(value => typeof value === "string" || (Array.isArray(value) && value.length > 0));
+      });
+    language: text/javascript
+order: 2000

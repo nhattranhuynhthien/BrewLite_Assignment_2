@@ -1,0 +1,3 @@
+$kind: collection
+description: Dùng danh mục từ prisma/seed.cjs và sản phẩm đã ẩn từ prisma/seed-postman.cjs.
+order: 3000

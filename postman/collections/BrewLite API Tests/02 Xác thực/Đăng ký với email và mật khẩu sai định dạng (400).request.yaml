@@ -1,0 +1,30 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "invalid-email",
+      "fullName": "X",
+      "password": "abcdefgh"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 400", function () {
+        pm.response.to.have.status(400);
+      });
+      pm.test("Phản hồi lỗi có cấu trúc NestJS", function () {
+        const body = pm.response.json();
+        pm.expect(body.statusCode).to.equal(400);
+        pm.expect(body.message).to.satisfy(value => typeof value === "string" || (Array.isArray(value) && value.length > 0));
+        pm.expect(body.message).to.be.an("array");
+        pm.expect(body.message.some(message => message.includes("email"))).to.equal(true);
+        pm.expect(body.message.some(message => message.includes("fullName"))).to.equal(true);
+        pm.expect(body.message.length).to.be.at.least(3);
+      });
+    language: text/javascript
+order: 3000

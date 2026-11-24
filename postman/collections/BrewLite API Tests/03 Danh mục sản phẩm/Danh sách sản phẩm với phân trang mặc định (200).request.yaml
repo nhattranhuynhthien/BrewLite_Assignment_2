@@ -1,0 +1,33 @@
+$kind: http-request
+url: "{{baseUrl}}/products"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Trang 1 có cấu trúc và số lượng hợp lệ", function () {
+        const body = pm.response.json();
+        pm.expect(body).to.include({ page: 1, pageSize: 20 });
+        pm.expect(body.total).to.be.at.least(0);
+        pm.expect(Number.isInteger(body.total)).to.equal(true);
+        pm.expect(body.items).to.be.an("array").with.lengthOf(Math.max(0, Math.min(body.pageSize, body.total - (body.page - 1) * body.pageSize)));
+        body.items.forEach(product => {
+          pm.expect(product.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+          pm.expect(product.name).to.be.a("string").and.not.empty;
+          pm.expect(product.basePrice).to.be.at.least(0);
+          pm.expect(product.stockQuantity).to.be.at.least(0);
+          pm.expect(product.isAvailable).to.equal(true);
+          pm.expect(product.category.id).to.equal(product.categoryId);
+        });
+        pm.expect(body.items, "Chạy seed danh mục").to.not.be.empty;
+        const ids = body.items.map(product => product.id);
+        pm.expect(ids).to.not.include(pm.variables.get("hiddenProductId"));
+        if (pm.response.code === 200) {
+          pm.collectionVariables.set("catalogPageOneIds", JSON.stringify(ids));
+          pm.collectionVariables.set("catalogTotal", String(body.total));
+        }
+      });
+    language: text/javascript
+order: 2000

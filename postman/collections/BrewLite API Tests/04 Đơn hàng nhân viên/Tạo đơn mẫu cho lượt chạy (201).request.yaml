@@ -1,0 +1,36 @@
+$kind: http-request
+url: "{{baseUrl}}/_test/postman/orders"
+method: POST
+auth:
+  type: bearer
+  credentials:
+    token: "{{staffToken}}"
+scripts:
+  - type: beforeRequest
+    code: |-
+      pm.collectionVariables.unset("paidOrderId");
+      pm.collectionVariables.unset("pendingOrderId");
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      let fixture;
+      let ready = false;
+      pm.test("Tạo hai đơn mẫu mới cho lượt chạy (201)", function () {
+        pm.expect(pm.response.code, "Bật POSTMAN_FIXTURES_ENABLED và seed dữ liệu mẫu theo README").to.equal(201);
+        fixture = pm.response.json();
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        pm.expect(fixture.paidOrder.status).to.equal("PAID");
+        pm.expect(fixture.pendingOrder.status).to.equal("PENDING_PAYMENT");
+        pm.expect(fixture.paidOrder.id).to.match(uuid);
+        pm.expect(fixture.pendingOrder.id).to.match(uuid);
+        pm.expect(fixture.pendingOrder.id).to.not.equal(fixture.paidOrder.id);
+        ready = true;
+      });
+      if (ready) {
+        pm.collectionVariables.set("paidOrderId", fixture.paidOrder.id);
+        pm.collectionVariables.set("pendingOrderId", fixture.pendingOrder.id);
+      } else {
+        pm.execution.setNextRequest(null);
+      }
+    language: text/javascript
+order: 500
